@@ -2803,7 +2803,17 @@ function admExposeAdvance() { admNotWiredYet('EXPOSE + ADVANCE'); }
         // neither scrolls nor types.
         e.preventDefault();
 
-        const dir = (e.key === '.') ? 1 : -1;   // . forward, , back
+        // Period key steps forward, comma key steps back. Keyed off e.code
+        // for the same layout-independence reason as the guard above - the
+        // shifted variants (':' and ';') must still map to forward/back.
+        // Direction from the PHYSICAL key, matching the e.code guard above.
+        // This line is why Shift+keyframe-jump broke: under Shift a Nordic
+        // layout emits ':' for the period key and ';' for the comma key, so
+        // e.key is never '.' and the old test collapsed every shifted press
+        // to dir = -1 (both jumped to the PREVIOUS keyframe). e.code reports
+        // the physical position ('Period' / 'Comma') no matter what character
+        // Shift produces, so forward/back stays correct shifted or not.
+        const dir = (e.code === 'Period') ? 1 : -1;   // period fwd, comma back
         if (e.shiftKey) stepKeyframe(dir);
         else            stepFrame(dir);
     }, true);   // capture phase
