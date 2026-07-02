@@ -2633,3 +2633,169 @@ document.addEventListener('DOMContentLoaded', () => { calibration.init(); framin
     }, false);
 
 }());
+
+/* ============================================================
+   ADM  (Animation Desk Mode) - frontend controls
+   ------------------------------------------------------------
+   ADM turns the VOP into a hand-cranked animation-desk camera:
+   park the playhead on a frame, the projection lights up with
+   that frame's composite (the background plate), place artwork
+   under the lens, expose one frame at a time.
+
+   The playhead is simply #probe_frame - the same Frame field the
+   rest of the app already treats as "where the system is". So
+   every stepper below is just "set #probe_frame, then fire Proj
+   Probe", nothing more exotic.
+   ============================================================ */
+
+/* Sorted keyframe frame-numbers for the CURRENT mode. A "keyframe" is any
+   row in the active exposure sheet; each row's frame field is id'd
+   <mode>_f<n> (sss_f1, mds_f2, ...) - the very ids the /status rehydration
+   already scans. We anchor the match to prefix + digits so only genuine
+   frame fields count, and we filter on the current mode's prefix, so the
+   hidden sheets of other modes are ignored automatically. */
+function admKeyframeFrames() {
+    const prefix = currentMode.toLowerCase() + '_f';   // sss_f, mds_f, dre_f, brk_f
+    const re = new RegExp('^' + prefix + '\\d+$');
+    const nums = [];
+    document.querySelectorAll('input').forEach(el => {
+        if (el.id && re.test(el.id)) {
+            const v = parseInt(el.value, 10);
+            if (!isNaN(v)) nums.push(v);
+        }
+    });
+    nums.sort((a, b) => a - b);
+    return nums;
+}
+
+/* Move the playhead by delta (+1 / -1) and re-light the projection.
+   Clamped 1..9999: frame 1 is the first latent, 9999 is the ceiling of the
+   4-digit latent_%04d filename pattern. We set #probe_frame directly and
+   call Proj Probe (runTask('preview')) instead of firing the field's own
+   change event: Proj Probe already re-reads the field, updates the gate
+   readouts and reloads the preview image, and dispatch_engine persists the
+   job as a side effect - so this single call covers save + gates + preview. */
+function stepFrame(delta) {
+    const f = document.getElementById('probe_frame');
+    if (!f) return;
+    let n = parseInt(f.value, 10);
+    if (isNaN(n)) n = 1;
+    n = Math.max(1, Math.min(9999, n + delta));
+    f.value = n;
+    runTask('preview');
+}
+
+/* Jump to the previous (dir < 0) or next (dir > 0) keyframe relative to the
+   current playhead, then re-light. Strictly-greater / strictly-less so a
+   repeated press always moves. At the ends we clamp (hold on the first /
+   last keyframe) rather than wrap - wrapping is disorienting when animating.
+   No-op if the sheet has no rows yet. */
+function stepKeyframe(dir) {
+    const f = document.getElementById('probe_frame');
+    if (!f) return;
+    const cur = parseInt(f.value, 10) || 1;
+    const frames = admKeyframeFrames();
+    if (!frames.length) return;
+
+    let target = null;
+    if (dir > 0) {
+        for (const n of frames) { if (n > cur) { target = n; break; } }
+        if (target === null) target = frames[frames.length - 1];   // clamp: last
+    } else {
+        for (let i = frames.length - 1; i >= 0; i--) {
+            if (frames[i] < cur) { target = frames[i]; break; }
+        }
+        if (target === null) target = frames[0];                   // clamp: first
+    }
+    f.value = target;
+    runTask('preview');
+}
+
+/* Handlers still waiting on their engine routes. admClear (C) needs the
+   projection-hold-clear route; the two EXPOSE handlers need the single-frame
+   exposure route. Both arrive with the engine work. Until then these only
+   log, so the buttons are safe to click and visibly do nothing. Swap each
+   body in when its route exists. */
+function admNotWiredYet(name) {
+    console.info('[ADM] "' + name + '" has no engine route yet - arriving with the exposure/hold work.');
+}
+function admClear()         { admNotWiredYet('C / clear projection'); }
+function admExposeFrame()   { admNotWiredYet('EXPOSE FRAME'); }
+function admExposeAdvance() { admNotWiredYet('EXPOSE + ADVANCE'); }
+
+/* ============================================================
+   ADM keyboard shortcuts
+   ------------------------------------------------------------
+   Live only while ADM is on AND the Main page is showing, so
+   these keys are wholly inert in normal operation.
+
+       .          step forward one frame
+       ,          step back one frame
+       Shift + .  next keyframe
+       Shift + ,  previous keyframe
+       Escape     blur the focused field (leave the "typing" state)
+
+   The . / , guard: if the caret sits in an editable field we do
+   NOTHING and let the character type - essential, because POS/ROT
+   fields are comma/period triples like "0.34,0.01,-0.7". Rule of
+   thumb: type freely inside fields; step frames from anywhere
+   neutral. Escape is the keyboard route to that neutral state (and
+   the natural hook for the planned physical cabinet buttons).
+
+   Separate listener from the arrow-key nav IIFE so the two can't
+   break each other. Registered in the capture phase to get first
+   crack, but it only ever calls preventDefault after all guards pass.
+   ============================================================ */
+(function () {
+    // "Editable" = a place where typing a character is meaningful. Buttons,
+    // checkboxes, radios and file inputs are NOT editable in that sense, so
+    // shortcuts still fire when one of those happens to hold focus.
+    function isEditable(el) {
+        if (!el) return false;
+        const tag = el.tagName;
+        if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+        if (tag === 'INPUT') {
+            const t = (el.type || 'text').toLowerCase();
+            return !['button', 'submit', 'reset', 'file', 'checkbox', 'radio'].includes(t);
+        }
+        return el.isContentEditable === true;
+    }
+
+    document.addEventListener('keydown', function (e) {
+        // Gate 1: ADM must be on. Otherwise these keys are untouched.
+        if (!document.body.classList.contains('adm-mode')) return;
+
+        // Escape: drop focus so the step keys go live. Allowed anywhere in
+        // ADM (before the Main-page gate) since blurring is harmless and you
+        // may want to un-focus a field even from the Calibration page.
+        if (e.key === 'Escape') {
+            const a = document.activeElement;
+            if (a && typeof a.blur === 'function') a.blur();
+            return;
+        }
+
+        // Only . and , matter from here.
+        if (e.key !== '.' && e.key !== ',') return;
+
+        // Gate 2: step only while Main is actually visible - that's where the
+        // stepper buttons are, and moving the playhead blind makes no sense.
+        const mainPage = document.getElementById('page_main');
+        if (!mainPage || !mainPage.classList.contains('page-active')) return;
+
+        // Gate 3: never steal a keystroke owned by a field. This is what lets
+        // "0.34,0.01,-0.7" type into a POS box untouched.
+        if (isEditable(document.activeElement)) return;
+
+        // Ctrl/Alt/Meta combos aren't ours (Shift IS: it promotes a single
+        // step to a keyframe jump).
+        if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+        // Guards cleared - this is a frame step. Claim the key so the page
+        // neither scrolls nor types.
+        e.preventDefault();
+
+        const dir = (e.key === '.') ? 1 : -1;   // . forward, , back
+        if (e.shiftKey) stepKeyframe(dir);
+        else            stepFrame(dir);
+    }, true);   // capture phase
+}());

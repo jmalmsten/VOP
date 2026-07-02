@@ -348,6 +348,34 @@ body {
     box-shadow: inset 0 2px 3px rgba(255, 235, 220, 0.18);
 }
 
+/* ADM navigation toggle - the "on" paint.
+   Reuses .page-nav-btn for the grey "off" look; .adm-on adds the SAME
+   green an active page button uses. Kept separate from .active because
+   .active means "current page" for Main/Calibration, whereas .adm-on
+   means "this mode is enabled" - identical paint, different meaning, so
+   a future reader isn't misled into thinking ADM is a page. */
+.page-nav-btn.adm-on {
+    background:    #1a4a1a;
+    color:         #cfc;
+    border-color:  #4a8a4a;
+}
+
+/* ADM control swap. Two mirrored helpers on body.adm-mode, matching the
+   brk-mode/dre-mode reveal pattern:
+     .non-adm-control - shown normally, hidden while ADM is on (Execute).
+     .adm-control     - hidden normally, shown while ADM is on (EXPOSE x2). */
+body.adm-mode .non-adm-control { display: none; }
+.adm-control                   { display: none; }
+body.adm-mode .adm-control     { display: block; }
+
+/* ADM stepper row: « ‹ C › ». Hidden until ADM is on, then one flex row of
+   five equal buttons. .action-btn defaults to width:100%; inside the flex
+   row we override to flex:1 so the five share the width instead of each
+   trying to fill it. */
+.adm-step-row                  { display: none; gap: 8px; margin-top: 8px; }
+body.adm-mode .adm-step-row    { display: flex; }
+.adm-step-row .action-btn      { flex: 1 1 0; width: auto; }
+
 /* Decorative VOP schematic, "printed" onto the board texture in the top-left.
    Absolute, so it sits outside the grid and shifts no panels. mix-blend-mode
    screen drops the PNG's black onto the texture (only the white linework

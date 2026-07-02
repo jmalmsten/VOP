@@ -32,7 +32,7 @@
 <head>
     <meta charset="UTF-8">
     <title>VOP v0.15</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=4.20">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=4.21">
 </head>
 <body>
     <div class="container">
@@ -48,10 +48,23 @@
                  the same URL and Flask returns the same HTML;
                  we just show/hide the corresponding section. -->
             <div class="page-nav">
+                <!-- Page selectors. Here .active means "this is the current page". -->
                 <button type="button" class="page-nav-btn active" id="nav_main_btn"
-                        onclick="showPage('main')">Main</button>
+                        onclick="showPage('main')"
+                        title="Main - job editor, mags/bipacks, exposure sheet and status.">Main</button>
                 <button type="button" class="page-nav-btn" id="nav_calibration_btn"
-                        onclick="showPage('calibration')">Calibration</button>
+                        onclick="showPage('calibration')"
+                        title="Calibration - Peak White measurement and optical calibration tools.">Calibration</button>
+                <!-- ADM is NOT a page - it's a mode TOGGLE sharing the same row.
+                    Clicking it flips body.adm-mode (see toggleADM below), which on the
+                    Main page swaps the Execute Sequence button for the hand-exposure
+                    and frame-stepper controls. Grey when off, green when on. Because
+                    Main is normally the active (green) page, turning ADM on lights two
+                    green buttons in the row - Main (the page) and ADM (the mode) -
+                    which is the intended "we're in ADM now" cue. -->
+                <button type="button" class="page-nav-btn" id="nav_adm_btn"
+                        onclick="toggleADM()"
+                        title="Animation Desk Mode - expose frames one at a time by hand and use the mags/bipacks projection as a lit background for artwork placed under the lens.">ADM</button>
             </div>
 
             <!-- Engine connection indicator. Lit when /status returns
@@ -281,7 +294,41 @@
                         </div>
                         <hr class="section-divider">
                         <button class="action-btn" onclick="triggerLabInvert()" title="Invert the latent image buffer for holdout mattes">LAB / INVERT</button>
-                        <button class="action-btn execute" onclick="runTask('execute')" title="Run a job of exposures">Execute Sequence</button>
+                        <button class="action-btn execute non-adm-control" onclick="runTask('execute')" title="Run a job of exposures">Execute Sequence</button>
+                        <!-- ADM exposure controls. Hidden normally; revealed by body.adm-mode
+                            (style.css). They occupy the slot Execute Sequence just vacated
+                            (Execute carries .non-adm-control and disappears the moment ADM is on).
+                            Both are .execute-green: committing one frame to the Cam Mag is every
+                            bit as consequential as running a whole job.
+                                EXPOSE FRAME    - shoot the frame in the gate now, leave playhead put.
+                                EXPOSE + ADVANCE- shoot it, then step forward one frame and re-light.
+                            Click handlers are wired together with the single-frame exposure engine
+                            route; until then they are inert no-ops (log only), safe to click. -->
+                        <button class="action-btn execute adm-control" onclick="admExposeFrame()"
+                                title="Expose the current gate frame and commit it to the Cam Mag. Once exposed it's exposed - there is no undo.">EXPOSE FRAME</button>
+                        <button class="action-btn execute adm-control" onclick="admExposeAdvance()"
+                                title="Expose the current gate frame, then advance the playhead one frame and re-light the projection.">EXPOSE + ADVANCE</button>
+
+                        <!-- Playhead steppers. Each moves #probe_frame - the single source of truth
+                            for where the whole system sits - then fires Proj Probe, so every gate
+                            (Cam Mag, Proj Mag, both BiPacks) jumps to that frame and the projection
+                            shows the composite.
+                                «  previous keyframe        (Shift + ,)
+                                ‹  back one frame           ( , )
+                                C  clear projection to idle (screen only - never erases a frame)
+                                ›  forward one frame        ( . )
+                                »  next keyframe            (Shift + .)
+                            "Keyframe" = a frame that has a row in the CURRENT mode's exposure sheet.
+                            C's screen-clear rides in with the projection-hold engine route; until
+                            then its handler is an inert no-op. Glyphs are «/‹/›/» - swap for literal
+                            "<<"/"<" etc. if you'd rather. -->
+                        <div class="adm-step-row">
+                            <button class="action-btn" onclick="stepKeyframe(-1)" title="Previous keyframe (Shift + ,)">&laquo;</button>
+                            <button class="action-btn" onclick="stepFrame(-1)"    title="Step back one frame ( , )">&lsaquo;</button>
+                            <button class="action-btn" onclick="admClear()"       title="Clear the projection screen back to the idle animation. Screen only - does not erase any exposed frame.">C</button>
+                            <button class="action-btn" onclick="stepFrame(1)"     title="Step forward one frame ( . )">&rsaquo;</button>
+                            <button class="action-btn" onclick="stepKeyframe(1)"  title="Next keyframe (Shift + .)">&raquo;</button>
+                        </div>
                         <!-- LIVE PREVIEW toggle (issue #205). When ticked, the
                              preview window refreshes with each frame as it
                              commits during an Execute job - for monitoring
@@ -492,7 +539,7 @@
         </div>
         <!-- {% include 'sections/cheat-sheet.html' %} -->
     </div>
-    <script src="{{ url_for('static', filename='main.js') }}?v=78"></script>
+    <script src="{{ url_for('static', filename='main.js') }}?v=79"></script>
     <!-- Page navigation handler. The Calibration page logic
              lives in main.js, but this small toggle is
              page-structural and stays here to avoid coupling
@@ -513,6 +560,24 @@
                 // the user can see which page is currently shown.
                 document.getElementById('nav_main_btn').classList.toggle('active', name === 'main');
                 document.getElementById('nav_calibration_btn').classList.toggle('active', name === 'calibration');
+            }
+
+            /* ADM (Animation Desk Mode) toggle.
+            Kept here beside showPage because - like page navigation - this is a
+            structural UI switch, not app logic: it only flips one body class and
+            the button's own highlight. What that class reveals (the EXPOSE buttons
+            and the stepper row) is pure CSS in style.css; the stepper/key BEHAVIOUR
+            lives in main.js.
+
+            Not persisted to the job on purpose: ADM defaults OFF on every load
+            (plain Main + fully automated jobs is the everyday mode), and switching
+            it back on is a single click. If we ever want it to survive reloads it
+            becomes a saved checkbox, the same way exec_live_preview is. */
+            function toggleADM() {
+                // classList.toggle returns the resulting on/off boolean.
+                const on = document.body.classList.toggle('adm-mode');
+                // Mirror that onto the button so it paints green while on.
+                document.getElementById('nav_adm_btn').classList.toggle('adm-on', on);
             }
         </script>
         <br>
