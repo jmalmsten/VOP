@@ -2774,8 +2774,17 @@ function admExposeAdvance() { admNotWiredYet('EXPOSE + ADVANCE'); }
             return;
         }
 
-        // Only . and , matter from here.
-        if (e.key !== '.' && e.key !== ',') return;
+        // Identify the physical key by e.code, NOT by the produced character.
+        // On a Nordic/Swedish layout the comma key under Shift produces ';'
+        // and the period key under Shift produces ':', so e.key is no longer
+        // ',' / '.' the instant Shift is held - which is exactly why the
+        // Shift+keyframe jumps did nothing. e.code reports the physical key
+        // position ('Comma' / 'Period') regardless of keyboard layout AND
+        // regardless of Shift, so both the plain step and the shifted
+        // keyframe-jump resolve correctly. (This is the same layout trap that
+        // ruled out square/curly brackets earlier - AltGr/Shift remap the
+        // character but never the e.code.)
+        if (e.code !== 'Period' && e.code !== 'Comma') return;
 
         // Gate 2: step only while Main is actually visible - that's where the
         // stepper buttons are, and moving the playhead blind makes no sense.
