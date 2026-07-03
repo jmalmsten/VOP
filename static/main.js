@@ -2688,6 +2688,13 @@ function admKeyframeFrames() {
    readouts and reloads the preview image, and dispatch_engine persists the
    job as a side effect - so this single call covers save + gates + preview. */
 function stepFrame(delta) {
+    // No scrubbing mid-exposure: moving the playhead while the camera
+    // integrates would desync the Frame field from the frame actually
+    // being shot, and the Proj Probe this fires would be swallowed by
+    // the busy engine anyway (see _admExposeBusy). Guarding here covers
+    // the GUI arrows AND the keyboard bindings in one place, since the
+    // key handler funnels through these functions.
+    if (_admExposeBusy) return;
     const f = document.getElementById('probe_frame');
     if (!f) return;
     let n = parseInt(f.value, 10);
@@ -2703,6 +2710,13 @@ function stepFrame(delta) {
    last keyframe) rather than wrap - wrapping is disorienting when animating.
    No-op if the sheet has no rows yet. */
 function stepKeyframe(dir) {
+    // No scrubbing mid-exposure: moving the playhead while the camera
+    // integrates would desync the Frame field from the frame actually
+    // being shot, and the Proj Probe this fires would be swallowed by
+    // the busy engine anyway (see _admExposeBusy). Guarding here covers
+    // the GUI arrows AND the keyboard bindings in one place, since the
+    // key handler funnels through these functions.
+    if (_admExposeBusy) return;
     const f = document.getElementById('probe_frame');
     if (!f) return;
     const cur = parseInt(f.value, 10) || 1;
@@ -2723,28 +2737,97 @@ function stepKeyframe(dir) {
     runTask('preview');
 }
 
-/* Handlers still waiting on their engine routes. admClear (C) needs the
-   projection-hold-clear route; the two EXPOSE handlers need the single-frame
-   exposure route. Both arrive with the engine work. Until then these only
-   log, so the buttons are safe to click and visibly do nothing. Swap each
-   body in when its route exists. */
-function admNotWiredYet(name) {
-    console.info('[ADM] "' + name + '" has no engine route yet - arriving with the exposure/hold work.');
+/* True while an ADM exposure is in flight. One flag guarding three
+ * hazards through one funnel: double-tapping an EXPOSE button, scrubbing
+ * the playhead mid-shot (confusing at best - the heartbeat would claim
+ * EXPOSING frame N while the Frame field reads N+3), and the IPC hazard
+ * underneath both: vop.py writes every dispatch to the SAME command
+ * file, so a command posted while the engine is busy gets silently
+ * deleted - unprocessed - by the running task's cleanup. */
+let _admExposeBusy = false;
+
+/* Resolve when the engine returns to idle. /status reports "rendering"
+ * exactly as long as the IPC command file exists, so polling it IS the
+ * completion signal - the same source of truth the status bar reads.
+ * Half-second cadence is plenty against exposures measured in seconds
+ * to minutes. The cap is a safety valve for a crashed engine, not a
+ * deadline: on expiry we stop waiting and log, and the operator sees
+ * the stuck status bar tell the same story. */
+async function admWaitForIdle(capMs = 10 * 60 * 1000) {
+    const t0 = Date.now();
+    while (Date.now() - t0 < capMs) {
+        try {
+            const r = await fetch('/status');
+            const st = await r.json();
+            if (st.status !== 'rendering') return true;
+        } catch (e) {
+            // Transient fetch failure (Wi-Fi blip, Flask restart): keep
+            // waiting rather than abandon the choreography mid-shot.
+        }
+        await new Promise(res => setTimeout(res, 500));
+    }
+    console.warn('[ADM] gave up waiting for the engine after ' + (capMs / 1000) + 's');
+    return false;
 }
-/* C - release the projection hold; the panel returns to the idle
- * animation within a frame. Screen only: no latent, mag, or sheet is
- * touched (once exposed, it's exposed). Plain Flask route, no engine
- * dispatch, so it works instantly even while the engine is mid-task.
- * Fire-and-forget: a network hiccup just means pressing C again. */
-async function admClear() {
+
+/* EXPOSE FRAME - commit the playhead's frame to the Cam Mag, stay put. */
+async function admExposeFrame() {
+    // Refuse while an ADM shot is in flight OR any engine task at all
+    // (a running Execute job, a calibration measurement...) is busy -
+    // see the busy flag's comment for the command-file swallow this
+    // sidesteps. isEngineRunning is the status poll's own view of the
+    // engine, so the two flags together cover both "we started it" and
+    // "something else did".
+    if (_admExposeBusy || isEngineRunning) {
+        console.info('[ADM] engine busy - exposure ignored.');
+        return;
+    }
+    _admExposeBusy = true;
     try {
-        await fetch('/adm_clear', { method: 'POST' });
-    } catch (e) {
-        console.error('[ADM] clear-hold request failed:', e);
+        await runTask('adm_expose');   // dispatch; returns immediately
+        await admWaitForIdle();        // parks OUR choreography, not Flask
+
+        // Deterministic preview refresh. The status poll also refreshes
+        // on its running->idle transition, but a quick exposure can slip
+        // clean between two polls; reloading here guarantees the fresh
+        // latent (written when Live preview is ticked) reaches the
+        // preview window - and the waveforms repaint on the image's own
+        // load event, so they ride along for free.
+        const lp = document.getElementById('exec_live_preview');
+        if (lp && lp.checked) {
+            document.getElementById('probe_img').src =
+                '/static/probe_live.jpg?t=' + Date.now();
+        }
+    } finally {
+        _admExposeBusy = false;        // never leave the buttons dead
     }
 }
-function admExposeFrame()   { admNotWiredYet('EXPOSE FRAME'); }
-function admExposeAdvance() { admNotWiredYet('EXPOSE + ADVANCE'); }
+
+/* EXPOSE + ADVANCE - commit the frame, then step forward and re-light. */
+async function admExposeAdvance() {
+    if (_admExposeBusy || isEngineRunning) {
+        console.info('[ADM] engine busy - exposure ignored.');
+        return;
+    }
+    _admExposeBusy = true;
+    try {
+        await runTask('adm_expose');
+        await admWaitForIdle();
+    } finally {
+        // Cleared BEFORE the advance on purpose: stepFrame refuses to
+        // move while the flag is up (that refusal is the mid-shot
+        // scrubbing guard), and the exposure it guarded is now over.
+        _admExposeBusy = false;
+    }
+    // Advance + re-light. stepFrame bumps the Frame field and fires a
+    // Proj Probe, which - with ADM on - carries the hold flag, so the
+    // panel's background plate moves to the NEW frame. Note the browser
+    // preview window therefore ends on the new frame's PLATE, not the
+    // just-exposed latent: the plate refresh necessarily overwrites
+    // probe_live.jpg. "Where am I now" beats "where was I" right after
+    // an advance - and Cam Probe shows any latent on demand.
+    stepFrame(1);
+}
 
 /* ============================================================
    ADM keyboard shortcuts

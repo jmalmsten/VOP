@@ -2572,6 +2572,68 @@ def run_persistent_engine():
                     else:
                         log_audit(f">>> LENS CAP CHECK FAILED. ABORTED. <<<")
 
+                elif task == 'adm_expose':
+                    # ADM hand-crank exposure: shoot exactly ONE frame - the
+                    # one the playhead (probe_frame) sits on - and commit its
+                    # latent to the Cam Mag. Functionally a single iteration
+                    # of the execute loop, minus everything that only makes
+                    # sense for a whole job: no ETA / size projection (there
+                    # is no "rest of the job"), no end-of-job workprint, and
+                    # no ntfy ping (NOTIFY_TASKS gates on task name, and ADM
+                    # is an at-the-desk operation by definition - the operator
+                    # is standing right here with artwork under the lens).
+                    #
+                    # The execute branch's zero-exposure skip is also
+                    # deliberately absent. EXPOSE FRAME is an explicit
+                    # operator command: if the sheet resolves exp to 0 on
+                    # this frame, the machine exposes a dark frame and adds
+                    # (near) zero light to the latent - exactly what a real
+                    # printer does with the lamp down. Dumb light adder,
+                    # always.
+                    f = int(float(job_data.get('probe_frame', 1)))
+
+                    # Announce BEFORE the blocking capture, same order as the
+                    # execute loop, so the status bar reads
+                    # "EXPOSING (ADM) [1/1]" for the whole shot.
+                    with open("/tmp/vop_heartbeat", "w") as hbf:
+                        json.dump({
+                            "current": 1, "total": 1, "eta": 0,
+                            "est_mb": 0.0, "msg": "EXPOSING (ADM)"
+                        }, hbf)
+
+                    # Mode-dispatched capture + additive latent write. No
+                    # flags: is_preview / is_comp_preview default to False,
+                    # so this is the real thing - the smear plays on the
+                    # panel, the camera integrates, the DNG decodes, and the
+                    # result stacks additively onto latent_NNNN.tif (or runs
+                    # the full bracket-and-merge path if the mode is BRK).
+                    execute_exposure(f)
+
+                    # Honour the Live preview toggle exactly as execute does:
+                    # re-read the latent that just committed and publish it
+                    # as probe_live.jpg, so the browser preview + waveforms
+                    # show the ACCUMULATED frame. Guarded on file existence
+                    # because a failed capture writes no TIFF; and the helper
+                    # swallows its own errors, so a preview hiccup can never
+                    # retroactively fail an exposure that already landed.
+                    out_f = os.path.join(cam_mag_dir, f"latent_{str(f).zfill(4)}.tif")
+                    if bool(job_data.get('exec_live_preview', False)) and os.path.exists(out_f):
+                        cutil.write_live_preview_from_latent(
+                            out_f, static_dir,
+                            par_x=par_x, par_y=par_y,
+                            preview_unsqueeze=preview_unsqueeze
+                        )
+
+                    log_audit(f"ADM EXPOSE: frame {f} committed to Cam Mag.")
+
+                    # Nothing more to do here - and that is the point. TASK
+                    # CLEANUP below removes the command file, the loop falls
+                    # back to idle, and the ADM hold sentinel + cached
+                    # texture (both untouched by this task) put the held
+                    # background plate straight back on the panel. The
+                    # post-exposure re-hold is not code; it is the hold
+                    # design doing its job.
+
                 elif task == 'execute':
                     frames = sorted({k['f'] for k in timeline.tracks['pos']})
                     if frames:

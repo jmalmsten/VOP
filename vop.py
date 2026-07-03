@@ -1283,6 +1283,20 @@ def adm_clear():
         pass   # nothing was held; treat as success
     return jsonify({"status": "ok"})
 
+@app.route('/adm_expose', methods=['POST'])
+def adm_expose():
+    # ADM's EXPOSE FRAME / EXPOSE + ADVANCE. Dispatches the engine to
+    # expose the single frame the playhead is parked on. Fire-and-forget
+    # like /execute - deliberately NOT in dispatch_engine's blocking
+    # list, because one frame legitimately takes anywhere from a couple
+    # of seconds (SSS) to minutes (BRK with many brackets, MDS with long
+    # smears), which is far too long to pin a Flask thread. The frontend
+    # watches /status instead - "rendering" means the IPC command file
+    # still exists - and runs its advance / re-light choreography when
+    # the engine returns to idle.
+    dispatch_engine('adm_expose', request.json)
+    return jsonify({"status": "started"})
+
 @app.route('/calibration_feed')
 def calibration_feed():
     # The live MJPEG stream itself. The browser consumes this directly via
