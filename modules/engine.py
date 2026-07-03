@@ -69,6 +69,15 @@ COMMAND_FILE = "/tmp/vop_cmd.json"
 # defines the identical path on its side - keep the two in sync.
 CAL_TARGETS_FILE = "/tmp/vop_cal_targets"
 
+# ADM (Animation Desk Mode) projection hold. While this file exists AND the
+# engine holds a cached hold texture, the idle branch shows that texture -
+# the last Proj Probe composite - instead of the bouncing logo, so the
+# projection stays lit as a background plate while artwork is placed under
+# the lens. Created by the engine's preview task (only it knows when the
+# texture is ready); deleted by vop.py's /adm_clear route (the C button)
+# or at engine boot (a texture never survives a daemon restart).
+ADM_HOLD_FILE = "/tmp/vop_adm_hold"
+
 def handle_sigterm(signum, frame):
     """
     Catches the Kill signal (sent when the VOP service restarts or stops).
@@ -316,6 +325,26 @@ def run_persistent_engine():
     tex_ip, asp_ip = build_ip_texture(ctx)
     ip_refresh_counter = 0
     IP_REFRESH_FRAMES = 300   # ~5s at 60fps; cheap, catches DHCP changes
+
+    # ---------------------------------------------------------
+    # ADM PROJECTION HOLD STATE
+    # ---------------------------------------------------------
+    # adm_hold_tex caches the most recent Proj-Probe composite as a GPU
+    # texture, uploaded once per probe and then blitted every idle frame
+    # while ADM_HOLD_FILE exists. Render-once-then-blit keeps the held
+    # plate perfectly static for the camera and costs the idle loop one
+    # textured fullscreen quad - trivially cheap on the Pi 4's GPU.
+    adm_hold_tex = None
+
+    # Sweep any sentinel a previous daemon left behind: /tmp outlives a
+    # service restart but VRAM does not, so a surviving flag would claim
+    # a hold we can no longer show. Idle also checks tex-is-not-None
+    # before trusting the flag, but stale state should be removed, not
+    # just stepped around.
+    try:
+        os.remove(ADM_HOLD_FILE)
+    except FileNotFoundError:
+        pass   # normal case: no hold was active when the daemon last died
 
     # ---------------------------------------------------------
     # MAIN IPC LOOP
@@ -1747,6 +1776,44 @@ def run_persistent_engine():
                     out_file = os.path.join(static_dir, "probe_live.jpg")
                     cv2.imwrite(out_file, img_data)
                     pygame.display.flip()
+
+                    # ---- ADM PROJECTION HOLD CAPTURE ----
+                    # When the frontend flags adm_hold (Proj Probe / frame
+                    # steppers with ADM on), cache this composite so the idle
+                    # branch can keep it on the panel after this task ends.
+                    #
+                    # raw_bytes (read above, pre-JPG-processing) is reused
+                    # untouched, and deliberately so on two counts:
+                    #   1. CONTENT - the hold must be the panel-true composite
+                    #      the camera photographs. The JPG pipeline that
+                    #      follows the read (PAR unsqueeze, letterbox into a
+                    #      Cam-View-shaped canvas) is browser presentation
+                    #      only and must NOT leak onto the projection.
+                    #   2. ORIENTATION - ctx.screen.read() returns GL-style
+                    #      bottom-up rows, and the shared quad's UVs already
+                    #      expect bottom-up input (that's why the boot code
+                    #      pre-flips branding.png before upload). The two
+                    #      conventions cancel: upload as-is, no flip, no copy.
+                    #
+                    # Tolerant truthiness check because the flag crosses two
+                    # JSON hops (fetch body -> COMMAND_FILE): a native JSON
+                    # true arrives as Python True, but accept the common
+                    # string spellings too so a future caller can't silently
+                    # fail to hold.
+                    if str(job_data.get('adm_hold', '')).lower() in ('true', '1', 'on'):
+                        # Replace, don't leak: release the previous hold's
+                        # VRAM before uploading the new composite. Same
+                        # swap discipline the idle IP texture refresh uses.
+                        if adm_hold_tex is not None:
+                            adm_hold_tex.release()
+                        adm_hold_tex = ctx.texture((WIDTH, HEIGHT), 4, raw_bytes)
+
+                        # Sentinel LAST, strictly after the texture exists,
+                        # so the idle branch can never observe the flag
+                        # without a texture to show. Touch-style create;
+                        # existence is the whole message.
+                        open(ADM_HOLD_FILE, 'w').close()
+                        log_audit(f"ADM HOLD: frame {job_data.get('probe_frame', '?')} composite cached and held.")
                     
                 elif task == 'cam_preview':
                     # Cam View. For all modes including BRK, this routes
@@ -2505,6 +2572,68 @@ def run_persistent_engine():
                     else:
                         log_audit(f">>> LENS CAP CHECK FAILED. ABORTED. <<<")
 
+                elif task == 'adm_expose':
+                    # ADM hand-crank exposure: shoot exactly ONE frame - the
+                    # one the playhead (probe_frame) sits on - and commit its
+                    # latent to the Cam Mag. Functionally a single iteration
+                    # of the execute loop, minus everything that only makes
+                    # sense for a whole job: no ETA / size projection (there
+                    # is no "rest of the job"), no end-of-job workprint, and
+                    # no ntfy ping (NOTIFY_TASKS gates on task name, and ADM
+                    # is an at-the-desk operation by definition - the operator
+                    # is standing right here with artwork under the lens).
+                    #
+                    # The execute branch's zero-exposure skip is also
+                    # deliberately absent. EXPOSE FRAME is an explicit
+                    # operator command: if the sheet resolves exp to 0 on
+                    # this frame, the machine exposes a dark frame and adds
+                    # (near) zero light to the latent - exactly what a real
+                    # printer does with the lamp down. Dumb light adder,
+                    # always.
+                    f = int(float(job_data.get('probe_frame', 1)))
+
+                    # Announce BEFORE the blocking capture, same order as the
+                    # execute loop, so the status bar reads
+                    # "EXPOSING (ADM) [1/1]" for the whole shot.
+                    with open("/tmp/vop_heartbeat", "w") as hbf:
+                        json.dump({
+                            "current": 1, "total": 1, "eta": 0,
+                            "est_mb": 0.0, "msg": "EXPOSING (ADM)"
+                        }, hbf)
+
+                    # Mode-dispatched capture + additive latent write. No
+                    # flags: is_preview / is_comp_preview default to False,
+                    # so this is the real thing - the smear plays on the
+                    # panel, the camera integrates, the DNG decodes, and the
+                    # result stacks additively onto latent_NNNN.tif (or runs
+                    # the full bracket-and-merge path if the mode is BRK).
+                    execute_exposure(f)
+
+                    # Honour the Live preview toggle exactly as execute does:
+                    # re-read the latent that just committed and publish it
+                    # as probe_live.jpg, so the browser preview + waveforms
+                    # show the ACCUMULATED frame. Guarded on file existence
+                    # because a failed capture writes no TIFF; and the helper
+                    # swallows its own errors, so a preview hiccup can never
+                    # retroactively fail an exposure that already landed.
+                    out_f = os.path.join(cam_mag_dir, f"latent_{str(f).zfill(4)}.tif")
+                    if bool(job_data.get('exec_live_preview', False)) and os.path.exists(out_f):
+                        cutil.write_live_preview_from_latent(
+                            out_f, static_dir,
+                            par_x=par_x, par_y=par_y,
+                            preview_unsqueeze=preview_unsqueeze
+                        )
+
+                    log_audit(f"ADM EXPOSE: frame {f} committed to Cam Mag.")
+
+                    # Nothing more to do here - and that is the point. TASK
+                    # CLEANUP below removes the command file, the loop falls
+                    # back to idle, and the ADM hold sentinel + cached
+                    # texture (both untouched by this task) put the held
+                    # background plate straight back on the panel. The
+                    # post-exposure re-hold is not code; it is the hold
+                    # design doing its job.
+
                 elif task == 'execute':
                     frames = sorted({k['f'] for k in timeline.tracks['pos']})
                     if frames:
@@ -2528,12 +2657,83 @@ def run_persistent_engine():
                         eta_sec = 0
                         total_proj_est_mb = 0.0
 
+                        # Zero-exposure skip optimisation. When two adjacent
+                        # keyframes in the 'exp' track BOTH sit at exactly 0,
+                        # every frame between them (inclusive) also resolves
+                        # to <= 0 exposure: Catmull-Rom of 0 -> 0 stays at 0,
+                        # and any negative Hermite overshoot from non-zero
+                        # neighbouring keyframes is already collapsed to a
+                        # full blackout by the in_window guard in the shutter
+                        # timing loop below (`500.0 <= elapsed <= 500.0 +
+                        # smr_ms`). Skipping avoids the ~1s camera cycle for
+                        # frames that contribute no light to the latent, which
+                        # is the whole point of running composites with sparse
+                        # pass windows.
+                        #
+                        # BRK note: tracks['exp'] is a 1.0 placeholder for BRK
+                        # jobs (see interpolator.py ~L290-296 - BRK reads
+                        # t_peak from calibration.json instead), so this gate
+                        # never fires on BRK and those jobs behave exactly as
+                        # they did pre-optimisation.
+                        #
+                        # Exact float compare is intentional: values come
+                        # straight from require_float on a user-typed form
+                        # field, so "0" / "0.0" parses to exactly 0.0. A
+                        # deliberately-tiny exposure like 0.0001 means "a
+                        # very short exposure" and MUST still run.
+                        skippable = set()
+                        exp_track = timeline.tracks.get('exp', [])
+                        for i in range(len(exp_track) - 1):
+                            k1, k2 = exp_track[i], exp_track[i+1]
+                            if float(k1['val']) == 0.0 and float(k2['val']) == 0.0:
+                                # Inclusive on both endpoints. A keyframe with
+                                # exp=0 that borders a non-zero fade on the
+                                # OTHER side is still safe to skip AT its own
+                                # frame number: _get_val returns the stored
+                                # keyframe value verbatim at t == kf.f (only
+                                # the strictly-between-keyframes region gets
+                                # Hermite blended), so exp is exactly 0 there.
+                                for ff in range(int(k1['f']), int(k2['f']) + 1):
+                                    skippable.add(ff)
+
+                        # Frames we will actually capture (total minus what
+                        # we're skipping inside the job's frame range). Feeds
+                        # the ETA and size-projection math below so a job
+                        # that skips half its frames doesn't over-report by
+                        # 2x mid-run.
+                        skipped_in_range = sum(1 for ff in range(f_start, f_end + 1) if ff in skippable)
+                        capture_total = total_frames - skipped_in_range
+                        capture_done  = 0
+
                         for f in range(f_start, f_end + 1):
                             # 1-based index of the frame we are ABOUT to expose - the
                             # frame in the gate for the upcoming blocking capture, so
                             # it's the number the status bar AND gate playheads show
                             # WHILE the camera integrates.
                             in_progress = f - f_start + 1
+
+                            # Zero-exposure fast-skip. No camera trigger, no
+                            # HDMI blackout, no libcamera wait, no file IO -
+                            # just advance the frame counter and heartbeat so
+                            # the GUI shows steady motion, then loop. This is
+                            # what turns "run all 500 frames start-to-end"
+                            # into "run only the ~80 frames that actually add
+                            # light" on multi-pass composites where each pass
+                            # only touches a small window of the reel.
+                            #
+                            # eta_sec / total_proj_est_mb carry through from
+                            # the previous CAPTURED frame (or the seeded
+                            # zeros if we haven't captured one yet), so the
+                            # displayed numbers stay stable across a skip
+                            # run rather than flickering.
+                            if f in skippable:
+                                with open("/tmp/vop_heartbeat", "w") as hbf:
+                                    json.dump({
+                                        "current": in_progress, "total": total_frames,
+                                        "eta": eta_sec, "est_mb": round(total_proj_est_mb, 1),
+                                        "msg": "SKIP (zero exp)"
+                                    }, hbf)
+                                continue
 
                             # Announce the frame BEFORE the exposure starts, so the
                             # UI reads "EXPOSING <in_progress>" for the whole shot.
@@ -2551,11 +2751,23 @@ def run_persistent_engine():
                             execute_exposure(f)
 
                             # ---- post-exposure accounting (feeds NEXT iteration) ----
+                            # `done` still tracks total frames traversed (for
+                            # any downstream code that cares), but the ETA
+                            # math is now driven by capture_done: skipped
+                            # frames take near-zero time, so mixing them into
+                            # avg_time would dilute it and produce an ETA
+                            # that keeps shrinking toward zero as we blast
+                            # through a big skip run, then jumps back up
+                            # when captures resume. Amortising over captured
+                            # frames only, and multiplying by remaining
+                            # captures (not remaining raw frames), keeps the
+                            # displayed ETA stable.
                             done = in_progress
+                            capture_done += 1
 
                             elapsed = time.time() - start_t
-                            avg_time = elapsed / done
-                            eta_sec = int(avg_time * (total_frames - done))
+                            avg_time = elapsed / capture_done
+                            eta_sec = int(avg_time * (capture_total - capture_done))
 
                             out_f = os.path.join(cam_mag_dir, f"latent_{str(f).zfill(4)}.tif")
                             if os.path.exists(out_f):
@@ -2584,7 +2796,13 @@ def run_persistent_engine():
                                     )
 
                             avg_size = total_size_bytes / max(1, files_found)
-                            total_proj_est_mb = (avg_size * total_frames) / (1024 * 1024)
+                            # Skipped frames write no TIFF, so the projection
+                            # extrapolates over frames-that-will-capture, not
+                            # over total_frames. Without this fix, a job that
+                            # skips half its frames would show a projected
+                            # disk footprint ~2x what actually lands on the
+                            # SSD.
+                            total_proj_est_mb = (avg_size * capture_total) / (1024 * 1024)
 
                         ts = int(time.time())
                         out_mp4 = os.path.join(wp_dir, f"vop_wp_{ts}.mp4")
@@ -2762,6 +2980,48 @@ def run_persistent_engine():
                 pygame.display.flip()
                 time.sleep(1 / 60)   # same 60fps throttle as the logo path
                 continue
+
+            # --- ADM PROJECTION HOLD ---
+            # While ADM_HOLD_FILE exists, keep the cached Proj-Probe
+            # composite on the panel instead of the bouncing logo, so the
+            # projection acts as a steady background plate for artwork
+            # placed under the lens. Sits AFTER the calibration-targets
+            # block on purpose: an explicit calibration action outranks a
+            # lingering hold if both flags ever coexist.
+            #
+            # The tex-is-not-None guard covers the daemon-restart race: if
+            # a stale sentinel reappears (or boot cleanup failed) with no
+            # texture in VRAM, fall through to the logo rather than crash.
+            #
+            # Render cost: one textured fullscreen quad per idle frame -
+            # effectively the same bill as the logo it replaces. Re-blitting
+            # at 60fps (rather than flipping once and going quiet) keeps
+            # this branch identical in shape to its siblings and immune to
+            # anything a later task leaves in either DOUBLEBUF buffer.
+            if os.path.exists(ADM_HOLD_FILE) and adm_hold_tex is not None:
+                # Opaque screen-sized image on a freshly-cleared frame: no
+                # alpha compositing wanted, and the exposure path may have
+                # left BLEND on a multiplicative func - kill it explicitly,
+                # same defence the calibration-targets block runs.
+                ctx.disable(moderngl.BLEND)
+
+                # Identity MVP = quad corner-to-corner across NDC. No aspect
+                # maths needed: the texture was captured at exactly
+                # WIDTH x HEIGHT, so a full-screen mapping is 1:1 by
+                # construction.
+                prog['mvp'].write(np.eye(4, dtype='f4').tobytes())
+
+                # Neutral shader state: the composite already has every
+                # gel / mono decision baked in from render_world, so the
+                # blit must not tint or filter it a second time.
+                prog['filter_color'].write(np.array([1.0, 1.0, 1.0], dtype='f4'))
+                prog['mono_mode'].value = False
+
+                adm_hold_tex.use(0)
+                vao.render(moderngl.TRIANGLE_STRIP)
+                pygame.display.flip()
+                time.sleep(1 / 60)   # same 60fps throttle as the siblings
+                continue             # logo/IP block skipped while holding
 
             # --- IDLE-SCREEN ALPHA BLENDING ---
             # The logo and IP textures are straight-alpha RGBA surfaces

@@ -6,7 +6,7 @@
 > [!IMPORTANT]
 > **USE AT YOUR OWN RISK.** - This project is a learning experiment. If you brick your hardware, I cannot provide support outside of what has worked for me. Run this code only if you accept the risks of experimental software. And while this Flask Web application **CAN** be exposed on the public internet. I **HIGHLY** recommend doing it through a VPN instead if you want to reach it from outside.
 
-![VOP Logo with a colorful streak](static/VOP-Graphic.png)
+![VOP Logo](static/VOP-Graphic.png)
 ---
 # VOP
 
@@ -44,6 +44,7 @@ Mainly... me. I'm just putting this on a public repo in case someone out there w
 > - **Three Layers Per Exposure:** for each exposure, up to three layers of artwork can be used, they live in their own 3D space, and the 2D planes transforms are rendered into 2D images that are then multiplied together for exposure.
 > - **Multiple Exposures:** To combine passes, the VOP uses LIME (see above).
 > - **Anamorphic Workflow:** In order to maximize the pixels recorded on the camera, the VOP can use non-square pixels in it's math that can then be accounted for at playback or in your NLE/Compositor.
+> - **Animation Desk Mode (ADM)**: A rudimentary function set aimed to make the VOP able to be run manually frame by frame for shooting animations of things between the camera lens and the projection monitor.
 > - **Video I/O:** Video files can be uploaded to the VOP both on the Camera and Projector side. When a compatible video file is ingested using ffmpeg, it's converted into a sequence of TIFFs. And you can use that sequence with the step printing functionality of the VOP. When a job is finished, a low bitrate h264 workprint is generated for quick review, and a high quality ProRes4444 can be generated as well for easier post work.
 > - **Notifications:** As a single job can take multiple hours, a [ntfy server](https://github.com/binwiederhier/ntfy) is included in the deployment script so you can subscribe to it inside your LAN with a free phone app and be notified when a job has finished or failed.
 > 

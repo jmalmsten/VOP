@@ -79,7 +79,13 @@ COMMAND_FILE = "/tmp/vop_cmd.json"
 # CAL_TARGETS_FILE in modules/engine.py.
 CAL_TARGETS_FILE = "/tmp/vop_cal_targets"
 
-VOP_VERSION ="0.10.0"
+# ADM projection-hold sentinel. Must stay in sync with ADM_HOLD_FILE in
+# modules/engine.py, same arrangement as CAL_TARGETS_FILE above. The
+# ENGINE creates it (after caching the hold texture); THIS process only
+# ever deletes it, via /adm_clear.
+ADM_HOLD_FILE = "/tmp/vop_adm_hold"
+
+VOP_VERSION ="0.16.0" # <-- This line probably should be removed at some point as I won't remember to update it manually.
 
 # Initialize required directory structure on boot if missing
 PRORES_DIR = os.path.join(BASE_DIR, "ProRes")
@@ -1257,6 +1263,38 @@ def comp_preview():
     # The existing TIFF on disk is NEVER modified - this is purely a
     # viewfinder for lining up multi-pass exposures.
     dispatch_engine('comp_preview', request.json)
+    return jsonify({"status": "started"})
+
+@app.route('/adm_clear', methods=['POST'])
+def adm_clear():
+    # The C button in ADM: release the projection hold so the panel drops
+    # back to the idle animation. Screen-side only, by design - this never
+    # touches a latent, a mag, or the exposure sheet. Once exposed, it's
+    # exposed; the only eraser in this machine is the Nuke button.
+    #
+    # Not routed through dispatch_engine on purpose: removing a file needs
+    # no engine round-trip, can't queue behind a running task, and the
+    # engine's idle loop re-checks the sentinel every frame, so the panel
+    # reacts within ~16 ms even mid-Execute. Also harmlessly idempotent -
+    # C with nothing held is simply a no-op.
+    try:
+        os.remove(ADM_HOLD_FILE)
+    except FileNotFoundError:
+        pass   # nothing was held; treat as success
+    return jsonify({"status": "ok"})
+
+@app.route('/adm_expose', methods=['POST'])
+def adm_expose():
+    # ADM's EXPOSE FRAME / EXPOSE + ADVANCE. Dispatches the engine to
+    # expose the single frame the playhead is parked on. Fire-and-forget
+    # like /execute - deliberately NOT in dispatch_engine's blocking
+    # list, because one frame legitimately takes anywhere from a couple
+    # of seconds (SSS) to minutes (BRK with many brackets, MDS with long
+    # smears), which is far too long to pin a Flask thread. The frontend
+    # watches /status instead - "rendering" means the IPC command file
+    # still exists - and runs its advance / re-light choreography when
+    # the engine returns to idle.
+    dispatch_engine('adm_expose', request.json)
     return jsonify({"status": "started"})
 
 @app.route('/calibration_feed')

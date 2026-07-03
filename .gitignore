@@ -16,9 +16,6 @@ vop_focus_tests/
 *.mkv
 current_job.json
 ffmpeg_metadata.txt
-static/noise_data.json
-static/calibration.json
-
 # --- Python Junk ---
 __pycache__/
 *.py[cod]
@@ -51,3 +48,9 @@ vop_dump*.txt
 # Un-ignore in /static folder
 !/static/
 !/static/*
+
+# Re-ignore these
+
+static/noise_data.json
+static/calibration.json
+static/probe_live.jpg

@@ -1,12 +1,11 @@
-# V0.15.0
-## Notes: 
-First stable one ready for release? This has been tested with the new public predeploy and the existing deploy scriptsBoy, it's been a while. 
-## Added: 
-### predeploy_vop.sh
-Probably safe for public use version of the script I use for preparing a USB SSD for the VOP. When run, it will run through a checklist with the user to get their opinion of a few settings. Once all is run, you pull the USB SSD from the desktop or laptop and insert it to the Pi and boot it up. It should now be ready for installation of git and then cloning and deploying the VOP software. 
-
+# V0.16.0
+## Notes:
+## Added:
+### #15 - ADM Mode
+First iteration of the Animation Desk Mode that let's you use the VOP as a background for physical animations in front of the projection screen. Can be used for cel-animations, cutouts, puppets/claymation. A lot of things. And as with other things in the VOP. It's needlessly realistic. So there's no undos. Once a frame is committed to the Cam Mag. It's committed. 
+### Skip keyframe pairs that are 0 exposure time.
+This is simply to speed up working on composites that need multiple passes but not all passes need to run through the whole exposure sheet. The mechanism detects keyframe pairs that are set to 0 as exposure time. If a keyframe is 0 as exposure time but a keyframe on either side of it, before or after, is not 0, that's a fade and that shouldn't be skipped. 
 ## Changed:
-### Changed the logo for the branding
-Mostly for consistency. Now it should match the logo that's in the readme and the webGUI.
 
-## Fixed: 
+## Fixed:
+ 
