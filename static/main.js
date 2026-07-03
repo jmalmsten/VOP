@@ -347,6 +347,18 @@ function collectParams() {
 
 async function runTask(type) {
     const params = collectParams();
+
+    // ADM projection hold: when ADM is on, a Proj Probe doubles as "light
+    // this frame's composite on the panel and KEEP it there" - the engine
+    // caches what it just rendered and holds it through idle. Injected
+    // here (not in collectParams) because ADM state lives on <body> as a
+    // class, not in a form field. Deliberately 'preview' only: Cam Probe /
+    // Comp Probe inspect latents in the browser and must not touch what's
+    // on the projection panel.
+    if (type === 'preview' && document.body.classList.contains('adm-mode')) {
+        params.adm_hold = true;
+    }
+
     await fetch(`/${type}`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(params)});
     // comp_preview writes to the same /static/probe_live.jpg as the
     // other two preview types, so it gets the same image-reload treatment.
@@ -2719,7 +2731,18 @@ function stepKeyframe(dir) {
 function admNotWiredYet(name) {
     console.info('[ADM] "' + name + '" has no engine route yet - arriving with the exposure/hold work.');
 }
-function admClear()         { admNotWiredYet('C / clear projection'); }
+/* C - release the projection hold; the panel returns to the idle
+ * animation within a frame. Screen only: no latent, mag, or sheet is
+ * touched (once exposed, it's exposed). Plain Flask route, no engine
+ * dispatch, so it works instantly even while the engine is mid-task.
+ * Fire-and-forget: a network hiccup just means pressing C again. */
+async function admClear() {
+    try {
+        await fetch('/adm_clear', { method: 'POST' });
+    } catch (e) {
+        console.error('[ADM] clear-hold request failed:', e);
+    }
+}
 function admExposeFrame()   { admNotWiredYet('EXPOSE FRAME'); }
 function admExposeAdvance() { admNotWiredYet('EXPOSE + ADVANCE'); }
 

@@ -79,7 +79,13 @@ COMMAND_FILE = "/tmp/vop_cmd.json"
 # CAL_TARGETS_FILE in modules/engine.py.
 CAL_TARGETS_FILE = "/tmp/vop_cal_targets"
 
-VOP_VERSION ="0.10.0"
+# ADM projection-hold sentinel. Must stay in sync with ADM_HOLD_FILE in
+# modules/engine.py, same arrangement as CAL_TARGETS_FILE above. The
+# ENGINE creates it (after caching the hold texture); THIS process only
+# ever deletes it, via /adm_clear.
+ADM_HOLD_FILE = "/tmp/vop_adm_hold"
+
+VOP_VERSION ="0.16.0" # <-- This line probably should be removed at some point as I won't remember to update it manually.
 
 # Initialize required directory structure on boot if missing
 PRORES_DIR = os.path.join(BASE_DIR, "ProRes")
@@ -962,7 +968,7 @@ def upload_cam_mag():
     project), then runs ffmpeg with latent_NNNN.tif naming starting at
     frame 1. That naming is identical to what engine.py's execute path
     produces, so the LIME / Cam Probe / Comp View / ProRes render code
-    all consume ingested reels with zero special-casing.
+    all consume ingested reels with zero spe6cial-casing.
     
     Pix-fmt is rgb48le unconditionally: cam mag frames feed the LIME
     pipeline which is 16-bit throughout, so the mode-aware downgrade
@@ -1258,6 +1264,24 @@ def comp_preview():
     # viewfinder for lining up multi-pass exposures.
     dispatch_engine('comp_preview', request.json)
     return jsonify({"status": "started"})
+
+@app.route('/adm_clear', methods=['POST'])
+def adm_clear():
+    # The C button in ADM: release the projection hold so the panel drops
+    # back to the idle animation. Screen-side only, by design - this never
+    # touches a latent, a mag, or the exposure sheet. Once exposed, it's
+    # exposed; the only eraser in this machine is the Nuke button.
+    #
+    # Not routed through dispatch_engine on purpose: removing a file needs
+    # no engine round-trip, can't queue behind a running task, and the
+    # engine's idle loop re-checks the sentinel every frame, so the panel
+    # reacts within ~16 ms even mid-Execute. Also harmlessly idempotent -
+    # C with nothing held is simply a no-op.
+    try:
+        os.remove(ADM_HOLD_FILE)
+    except FileNotFoundError:
+        pass   # nothing was held; treat as success
+    return jsonify({"status": "ok"})
 
 @app.route('/calibration_feed')
 def calibration_feed():

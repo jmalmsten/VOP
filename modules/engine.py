@@ -69,6 +69,15 @@ COMMAND_FILE = "/tmp/vop_cmd.json"
 # defines the identical path on its side - keep the two in sync.
 CAL_TARGETS_FILE = "/tmp/vop_cal_targets"
 
+# ADM (Animation Desk Mode) projection hold. While this file exists AND the
+# engine holds a cached hold texture, the idle branch shows that texture -
+# the last Proj Probe composite - instead of the bouncing logo, so the
+# projection stays lit as a background plate while artwork is placed under
+# the lens. Created by the engine's preview task (only it knows when the
+# texture is ready); deleted by vop.py's /adm_clear route (the C button)
+# or at engine boot (a texture never survives a daemon restart).
+ADM_HOLD_FILE = "/tmp/vop_adm_hold"
+
 def handle_sigterm(signum, frame):
     """
     Catches the Kill signal (sent when the VOP service restarts or stops).
@@ -316,6 +325,26 @@ def run_persistent_engine():
     tex_ip, asp_ip = build_ip_texture(ctx)
     ip_refresh_counter = 0
     IP_REFRESH_FRAMES = 300   # ~5s at 60fps; cheap, catches DHCP changes
+
+    # ---------------------------------------------------------
+    # ADM PROJECTION HOLD STATE
+    # ---------------------------------------------------------
+    # adm_hold_tex caches the most recent Proj-Probe composite as a GPU
+    # texture, uploaded once per probe and then blitted every idle frame
+    # while ADM_HOLD_FILE exists. Render-once-then-blit keeps the held
+    # plate perfectly static for the camera and costs the idle loop one
+    # textured fullscreen quad - trivially cheap on the Pi 4's GPU.
+    adm_hold_tex = None
+
+    # Sweep any sentinel a previous daemon left behind: /tmp outlives a
+    # service restart but VRAM does not, so a surviving flag would claim
+    # a hold we can no longer show. Idle also checks tex-is-not-None
+    # before trusting the flag, but stale state should be removed, not
+    # just stepped around.
+    try:
+        os.remove(ADM_HOLD_FILE)
+    except FileNotFoundError:
+        pass   # normal case: no hold was active when the daemon last died
 
     # ---------------------------------------------------------
     # MAIN IPC LOOP
@@ -1747,6 +1776,44 @@ def run_persistent_engine():
                     out_file = os.path.join(static_dir, "probe_live.jpg")
                     cv2.imwrite(out_file, img_data)
                     pygame.display.flip()
+
+                    # ---- ADM PROJECTION HOLD CAPTURE ----
+                    # When the frontend flags adm_hold (Proj Probe / frame
+                    # steppers with ADM on), cache this composite so the idle
+                    # branch can keep it on the panel after this task ends.
+                    #
+                    # raw_bytes (read above, pre-JPG-processing) is reused
+                    # untouched, and deliberately so on two counts:
+                    #   1. CONTENT - the hold must be the panel-true composite
+                    #      the camera photographs. The JPG pipeline that
+                    #      follows the read (PAR unsqueeze, letterbox into a
+                    #      Cam-View-shaped canvas) is browser presentation
+                    #      only and must NOT leak onto the projection.
+                    #   2. ORIENTATION - ctx.screen.read() returns GL-style
+                    #      bottom-up rows, and the shared quad's UVs already
+                    #      expect bottom-up input (that's why the boot code
+                    #      pre-flips branding.png before upload). The two
+                    #      conventions cancel: upload as-is, no flip, no copy.
+                    #
+                    # Tolerant truthiness check because the flag crosses two
+                    # JSON hops (fetch body -> COMMAND_FILE): a native JSON
+                    # true arrives as Python True, but accept the common
+                    # string spellings too so a future caller can't silently
+                    # fail to hold.
+                    if str(job_data.get('adm_hold', '')).lower() in ('true', '1', 'on'):
+                        # Replace, don't leak: release the previous hold's
+                        # VRAM before uploading the new composite. Same
+                        # swap discipline the idle IP texture refresh uses.
+                        if adm_hold_tex is not None:
+                            adm_hold_tex.release()
+                        adm_hold_tex = ctx.texture((WIDTH, HEIGHT), 4, raw_bytes)
+
+                        # Sentinel LAST, strictly after the texture exists,
+                        # so the idle branch can never observe the flag
+                        # without a texture to show. Touch-style create;
+                        # existence is the whole message.
+                        open(ADM_HOLD_FILE, 'w').close()
+                        log_audit(f"ADM HOLD: frame {job_data.get('probe_frame', '?')} composite cached and held.")
                     
                 elif task == 'cam_preview':
                     # Cam View. For all modes including BRK, this routes
@@ -2851,6 +2918,48 @@ def run_persistent_engine():
                 pygame.display.flip()
                 time.sleep(1 / 60)   # same 60fps throttle as the logo path
                 continue
+
+            # --- ADM PROJECTION HOLD ---
+            # While ADM_HOLD_FILE exists, keep the cached Proj-Probe
+            # composite on the panel instead of the bouncing logo, so the
+            # projection acts as a steady background plate for artwork
+            # placed under the lens. Sits AFTER the calibration-targets
+            # block on purpose: an explicit calibration action outranks a
+            # lingering hold if both flags ever coexist.
+            #
+            # The tex-is-not-None guard covers the daemon-restart race: if
+            # a stale sentinel reappears (or boot cleanup failed) with no
+            # texture in VRAM, fall through to the logo rather than crash.
+            #
+            # Render cost: one textured fullscreen quad per idle frame -
+            # effectively the same bill as the logo it replaces. Re-blitting
+            # at 60fps (rather than flipping once and going quiet) keeps
+            # this branch identical in shape to its siblings and immune to
+            # anything a later task leaves in either DOUBLEBUF buffer.
+            if os.path.exists(ADM_HOLD_FILE) and adm_hold_tex is not None:
+                # Opaque screen-sized image on a freshly-cleared frame: no
+                # alpha compositing wanted, and the exposure path may have
+                # left BLEND on a multiplicative func - kill it explicitly,
+                # same defence the calibration-targets block runs.
+                ctx.disable(moderngl.BLEND)
+
+                # Identity MVP = quad corner-to-corner across NDC. No aspect
+                # maths needed: the texture was captured at exactly
+                # WIDTH x HEIGHT, so a full-screen mapping is 1:1 by
+                # construction.
+                prog['mvp'].write(np.eye(4, dtype='f4').tobytes())
+
+                # Neutral shader state: the composite already has every
+                # gel / mono decision baked in from render_world, so the
+                # blit must not tint or filter it a second time.
+                prog['filter_color'].write(np.array([1.0, 1.0, 1.0], dtype='f4'))
+                prog['mono_mode'].value = False
+
+                adm_hold_tex.use(0)
+                vao.render(moderngl.TRIANGLE_STRIP)
+                pygame.display.flip()
+                time.sleep(1 / 60)   # same 60fps throttle as the siblings
+                continue             # logo/IP block skipped while holding
 
             # --- IDLE-SCREEN ALPHA BLENDING ---
             # The logo and IP textures are straight-alpha RGBA surfaces

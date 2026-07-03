@@ -39,7 +39,7 @@
         
         <div class="vop-header">
             <!-- Page title -->
-            <h2>VOP v0.16.4</h2>
+            <h2>VOP v0.16.5</h2>
 
             <!-- Page navigation. Click to switch between Main
                  (job editor + status + xsheet) and Calibration
@@ -539,7 +539,7 @@
         </div>
         <!-- {% include 'sections/cheat-sheet.html' %} -->
     </div>
-    <script src="{{ url_for('static', filename='main.js') }}?v=81"></script>
+    <script src="{{ url_for('static', filename='main.js') }}?v=82"></script>
     <!-- Page navigation handler. The Calibration page logic
              lives in main.js, but this small toggle is
              page-structural and stays here to avoid coupling
@@ -578,6 +578,15 @@
                 const on = document.body.classList.toggle('adm-mode');
                 // Mirror that onto the button so it paints green while on.
                 document.getElementById('nav_adm_btn').classList.toggle('adm-on', on);
+
+                // Leaving ADM releases any projection hold, so the panel
+                // can't keep showing - or silently resurrect after a later
+                // job - a stale held plate from a mode we've exited.
+                // admClear lives in main.js; the typeof guard covers the
+                // (theoretical) case of this firing before that file runs.
+                if (!on && typeof admClear === 'function') {
+                    admClear();
+                }
             }
         </script>
         <br>
