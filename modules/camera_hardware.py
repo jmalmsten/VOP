@@ -35,6 +35,13 @@ import subprocess
 import time
 import os
 
+# Onboard status-LED blanker. Best-effort, never throws (see modules/leds.py).
+# camera_hardware is the single choke point EVERY exposure passes through, so
+# blanking here (trigger_capture) and restoring here (finish_capture) covers the
+# whole machine — main sequence, ADM, and all calibration captures — with the
+# engine none the wiser.
+import leds
+
 # Pi 4B hardware initialization delay. 
 # This dictates both the Python sleep timer and the libcamera pre-capture delay.
 PRIME_WAIT_MS = 1500 
@@ -101,7 +108,45 @@ def trigger_capture(output_path, total_ms, gain, awb_r, awb_b, resolution="2028x
         "-o", dummy_jpg
     ]
     
+    # BLANK THE ONBOARD LEDs, just before the exposure starts.
+    # This is the single point every camera capture in the VOP passes
+    # through, so one call here darkens the red PWR / green ACT LEDs for
+    # EVERY exposure (main sequence, ADM, calibration) — no per-call-site
+    # wiring needed. It fires ~PRIME_WAIT_MS before the shutter physically
+    # opens (the `-t` pre-capture delay), i.e. deliberately a hair EARLY:
+    # the LEDs are guaranteed dark before the sensor ever integrates light.
+    # leds.off() is best-effort and never raises, so a missing node or a
+    # permission hiccup can never stop the capture from launching.
+    # The matching restore lives in finish_capture(), below.
+    leds.off()
+
     return subprocess.Popen(cmd)
+
+def finish_capture(cam_proc):
+    """
+    Block until the capture subprocess has fully exited, then restore the
+    onboard LEDs. This is the exposure-END bracket that pairs with the
+    leds.off() inside trigger_capture (the exposure-START bracket).
+
+    Call this INSTEAD of a bare `cam_proc.wait()` at every capture site. By
+    the time Popen.wait() returns, rpicam-still has closed the shutter and
+    written the DNG to disk — i.e. the exposure is genuinely "done" — so this
+    is exactly the moment the operator's spec wants the LED to come back on.
+    Restoring here (rather than at each call site) keeps all LED behavior in
+    one place and means the engine never has to think about it.
+
+    leds.on() is best-effort and never raises. We restore in a finally block
+    so that even if the wait is interrupted (e.g. the process is killed and
+    wait() raises), we still make the attempt to turn the LEDs back on rather
+    than leaving them dark until the next capture.
+
+    Returns the subprocess return code, same as Popen.wait(), so callers that
+    ever want it keep working. (No current caller uses it.)
+    """
+    try:
+        return cam_proc.wait()
+    finally:
+        leds.on()
 
 def wait_for_sensor_prime():
     """

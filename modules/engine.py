@@ -766,7 +766,7 @@ def run_persistent_engine():
                 # ---------------------------------------------------------
                 
                 log_audit(f"[{datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}] EXPOSURE {frame_num} | HDMI sequence complete. Waiting for camera file IO.")
-                cam_proc.wait()
+                hw.finish_capture(cam_proc)
                 
                 # Delegate to the shared post-capture helper. Centralizes 
                 # the three preview / commit branches so the DRE path 
@@ -780,7 +780,7 @@ def run_persistent_engine():
                 Shared post-capture pipeline for both execute_exposure (SSS/MDS) 
                 and execute_dre_exposure (DRE) paths.
                 
-                After cam_proc.wait() returns, the DNG is on disk and the camera 
+                After hw.finish_capture(cam_proc) returns, the DNG is on disk and the camera 
                 doesn't care what kind of HDMI animation produced it. The three 
                 downstream paths (comp_preview / cam_preview / real exposure) 
                 are mode-agnostic, so we share one implementation.
@@ -1072,7 +1072,7 @@ def run_persistent_engine():
                 pygame.display.flip()
                 
                 log_audit(f"[{datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}] DRE-EXPOSURE {frame_num} | DRE sequence complete. Waiting for camera file IO.")
-                cam_proc.wait()
+                hw.finish_capture(cam_proc)
                 
                 # Delegate to the shared post-capture helper (same one 
                 # execute_exposure uses for SSS/MDS). The camera doesn't 
@@ -1434,7 +1434,7 @@ def run_persistent_engine():
                         ctx.finish()
                         pygame.display.flip()
 
-                        cam_proc.wait()
+                        hw.finish_capture(cam_proc)
                         captured_files.append(bracket_buf)
                         log_audit(
                             f"[{datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}] "
@@ -1873,7 +1873,7 @@ def run_persistent_engine():
                                                   job_data.get('cam_res', '2028x1520'))
                     hw.wait_for_sensor_prime()
                     time.sleep(total_ms / 1000.0) 
-                    cam_proc.wait()
+                    hw.finish_capture(cam_proc)
 
                     noise_val = cutil.measure_noise_floor(buf_f, static_dir)
                     log_audit(f">>> RECOMMENDED BLACK CLIP: {noise_val:.6f} <<<")
@@ -1929,7 +1929,7 @@ def run_persistent_engine():
                     )
                     hw.wait_for_sensor_prime()
                     time.sleep(total_ms / 1000.0)
-                    cam_proc.wait()
+                    hw.finish_capture(cam_proc)
 
                     # Centre-weighted brightness in [0.0, 1.0]. This
                     # writes probe_live.jpg as a side effect, so the
@@ -2056,7 +2056,7 @@ def run_persistent_engine():
                         )
                         hw.wait_for_sensor_prime()
                         time.sleep(total_ms / 1000.0)
-                        cam_proc.wait()
+                        hw.finish_capture(cam_proc)
 
                         return cutil.measure_centre_brightness(
                             buf_f, static_dir, return_dict=True
@@ -2251,7 +2251,7 @@ def run_persistent_engine():
                     )
                     hw.wait_for_sensor_prime()
                     time.sleep(total_ms / 1000.0)
-                    cam_proc.wait()
+                    hw.finish_capture(cam_proc)
 
                     # We want the dict form so we have per-channel
                     # info in the audit log - lets the user see if
@@ -2368,7 +2368,7 @@ def run_persistent_engine():
                         )
                         hw.wait_for_sensor_prime()
                         time.sleep(total_ms / 1000.0)
-                        cam_proc.wait()
+                        hw.finish_capture(cam_proc)
                         return cutil.measure_centre_brightness(
                             buf_f, static_dir, return_dict=True
                         )
@@ -2564,7 +2564,7 @@ def run_persistent_engine():
                                                   job_data.get('cam_res', '2028x1520'))
                     hw.wait_for_sensor_prime()
                     time.sleep(total_ms /1000.0)
-                    cam_proc.wait()
+                    hw.finish_capture(cam_proc)
                     
                     hp_count = cutil.map_hot_pixels(buf_f, static_dir)
                     if hp_count >= 0:
