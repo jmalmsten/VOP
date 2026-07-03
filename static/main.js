@@ -342,6 +342,21 @@ function collectParams() {
             p[el.id] = val;
         }
     });
+
+    // ADM (Animation Desk Mode) on/off state. Injected here rather than
+    // read from a field because the state lives on <body> as a class, not
+    // in a form element (same reasoning as the adm_hold flag in runTask).
+    // Riding EVERY collect means every save path - explicit saveJob, a
+    // field's triggerSync, any engine dispatch - keeps current_job.json's
+    // copy fresh, and the first-load hydration restores the toggle from
+    // it after a browser refresh. Native boolean, matching how checkbox
+    // values collect.
+    //
+    // NOT to be confused with adm_hold: adm_enabled is persistent job
+    // state ("the mode is on"), adm_hold is a per-dispatch command
+    // ("cache and hold this one render"). Distinct names on purpose.
+    p.adm_enabled = document.body.classList.contains('adm-mode');
+
     return p;
 }
 
@@ -1310,6 +1325,24 @@ setInterval(async () => {
                 currentMode = loadedMode.value; 
                 // Force the DOM to display the correct sheet corresponding to the state
                 toggleSheetVisibility();
+            }
+
+            // Restore the ADM toggle from the saved job - same pattern as
+            // the smear-mode restore just above: the generic loop hydrated
+            // the FIELDS, structural UI state gets re-applied explicitly.
+            // Tolerant of boolean or string truth, mirroring the checkbox
+            // convention in the hydration loop; a MISSING key resolves to
+            // false, so a freshly nuked session (default_job.json carries
+            // no adm_enabled) always boots with ADM off - the everyday
+            // fully-automated default. setADM is idempotent and does NOT
+            // save or touch the projection hold, so restoring "on" here
+            // leaves a server-side hold (which survived the refresh in
+            // /tmp) exactly as it was: panel plate, toggle, and steppers
+            // all agree again. typeof guard: setADM lives in the inline
+            // nav script which parses after this file - always done by
+            // the time the first poll tick fires, but cheap to be sure.
+            if (typeof setADM === 'function') {
+                setADM(st.params.adm_enabled === true || st.params.adm_enabled === 'true');
             }
 
             document.getElementById('probe_img').src = '/static/probe_live.jpg?t=' + Date.now();

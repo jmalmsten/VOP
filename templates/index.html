@@ -39,7 +39,7 @@
         
         <div class="vop-header">
             <!-- Page title -->
-            <h2>VOP v0.16.6</h2>
+            <h2>VOP v0.16.7</h2>
 
             <!-- Page navigation. Click to switch between Main
                  (job editor + status + xsheet) and Calibration
@@ -539,7 +539,7 @@
         </div>
         <!-- {% include 'sections/cheat-sheet.html' %} -->
     </div>
-    <script src="{{ url_for('static', filename='main.js') }}?v=83"></script>
+    <script src="{{ url_for('static', filename='main.js') }}?v=84"></script>
     <!-- Page navigation handler. The Calibration page logic
              lives in main.js, but this small toggle is
              page-structural and stays here to avoid coupling
@@ -564,26 +564,47 @@
 
             /* ADM (Animation Desk Mode) toggle.
             Kept here beside showPage because - like page navigation - this is a
-            structural UI switch, not app logic: it only flips one body class and
-            the button's own highlight. What that class reveals (the EXPOSE buttons
-            and the stepper row) is pure CSS in style.css; the stepper/key BEHAVIOUR
-            lives in main.js.
+            structural UI switch: one body class plus the button's own highlight.
+            What that class reveals (the EXPOSE buttons and the stepper row) is
+            pure CSS in style.css; the stepper/key BEHAVIOUR lives in main.js.
 
-            Not persisted to the job on purpose: ADM defaults OFF on every load
-            (plain Main + fully automated jobs is the everyday mode), and switching
-            it back on is a single click. If we ever want it to survive reloads it
-            becomes a saved checkbox, the same way exec_live_preview is. */
-            function toggleADM() {
-                // classList.toggle returns the resulting on/off boolean.
-                const on = document.body.classList.toggle('adm-mode');
-                // Mirror that onto the button so it paints green while on.
+            Split into two layers:
+              setADM(on)  - idempotent state APPLIER. Paints the class and the
+                            nav button, nothing else. Called by toggleADM below
+                            and by the first-load hydration in main.js, which
+                            restores the saved state after a browser refresh
+                            and must do so without re-saving what it just
+                            loaded or firing a needless hold-clear.
+              toggleADM() - the USER ACTION. Flips the state, persists it to
+                            current_job.json (so it survives refreshes for the
+                            life of the job - Nuke Job resets to defaults,
+                            which carry no ADM key, so a new job boots with
+                            ADM off), and releases the projection hold when
+                            leaving the mode. */
+            function setADM(on) {
+                document.body.classList.toggle('adm-mode', on);
+                // Mirror onto the nav button so it paints green while on.
                 document.getElementById('nav_adm_btn').classList.toggle('adm-on', on);
+            }
+
+            function toggleADM() {
+                // Flip FIRST, then persist: saveJob's collectParams reads the
+                // body class, so the class must reflect the new state before
+                // the collect runs.
+                const on = !document.body.classList.contains('adm-mode');
+                setADM(on);
+
+                // Persist immediately rather than waiting for the next field
+                // edit to carry it - a refresh right after toggling should
+                // already find the new state in current_job.json. saveJob
+                // lives in main.js; typeof-guarded like admClear below.
+                if (typeof saveJob === 'function') {
+                    saveJob();
+                }
 
                 // Leaving ADM releases any projection hold, so the panel
                 // can't keep showing - or silently resurrect after a later
                 // job - a stale held plate from a mode we've exited.
-                // admClear lives in main.js; the typeof guard covers the
-                // (theoretical) case of this firing before that file runs.
                 if (!on && typeof admClear === 'function') {
                     admClear();
                 }
