@@ -968,7 +968,7 @@ def upload_cam_mag():
     project), then runs ffmpeg with latent_NNNN.tif naming starting at
     frame 1. That naming is identical to what engine.py's execute path
     produces, so the LIME / Cam Probe / Comp View / ProRes render code
-    all consume ingested reels with zero spe6cial-casing.
+    all consume ingested reels with zero special-casing.
     
     Pix-fmt is rgb48le unconditionally: cam mag frames feed the LIME
     pipeline which is 16-bit throughout, so the mode-aware downgrade
