@@ -1243,6 +1243,10 @@ function setGateCurrents(gates) {
 setInterval(async () => {
     try {
         const r = await fetch('/status');
+        // fetch() does NOT reject on HTTP 4xx/5xx - only on network failure.
+        // Force a non-OK response into the catch so a Flask error also
+        // reads OFFLINE, not a false ONLINE.
+        if (!r.ok) throw new Error('status ' + r.status);
         const st = await r.json();
         
         if (isFirstLoad && st.params && Object.keys(st.params).length > 0) {
@@ -1349,7 +1353,16 @@ setInterval(async () => {
             isFirstLoad = false;
         }
 
-        document.getElementById('sync_indicator').innerHTML = st.params ? '<span style="color:#0f0">● ONLINE</span>' : '○ OFFLINE';
+        // Reaching this line means fetch() resolved and r.json() parsed,
+        // so the Pi's web server answered - it IS reachable. ONLINE is
+        // therefore unconditional here. The OFFLINE state is set in the
+        // catch block below, which is the ONLY place a failed poll lands.
+        // Colour comes from the .sync-online / .sync-offline classes in
+        // style.css (no inline style), which we toggle rather than rewrite.
+        const _sync = document.getElementById('sync_indicator');
+        _sync.textContent = '● ONLINE';
+        _sync.classList.remove('sync-offline');
+        _sync.classList.add('sync-online');
         const msgEl = document.getElementById('st_msg');
         const bar = document.getElementById('st_bar');
         const etaEl = document.getElementById('st_eta');
@@ -1420,7 +1433,18 @@ setInterval(async () => {
         if (st.status === 'rendering') {
             setGateCurrents(st.gates);
         }
-    } catch(e) { console.error("Poll Error:", e); }
+    } catch(e) {
+        console.error("Poll Error:", e);
+        // fetch() (or the JSON parse) threw, meaning the Pi's web server
+        // did not answer this tick - so mark the indicator OFFLINE. This
+        // is the fix for the "always ONLINE" bug: previously the catch
+        // only logged, so the last successful poll left the indicator
+        // reading ONLINE and nothing ever flipped it back when the Pi died.
+        const _sync = document.getElementById('sync_indicator');
+        _sync.textContent = '○ OFFLINE';
+        _sync.classList.remove('sync-online');
+        _sync.classList.add('sync-offline');
+    }
 }, 1000);
 
 // --- HTML5 Drag and Drop Fallback ---

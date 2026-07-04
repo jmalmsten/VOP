@@ -85,6 +85,9 @@ Description:        Stylings for the whole GUI
     --color-success:        #080;       /* Execute Sequence button background */
     --color-panic:          #800;       /* Hardware Panic button */
 
+    --color-online:         #0f0;       /* Sync indicator: Pi web server reachable  */
+    --color-offline:        #f44;       /* Sync indicator: polling is failing 
+
     /* >>> Background & Panels <<< */
 
     --bg-body:              #070707;                /* Background for the whole thing */
@@ -249,6 +252,16 @@ body {
     justify-content:    space-between; 
     align-items:        center; 
     border-bottom:      1px solid var(--border-color); 
+}
+
+/* Sync indicator (top-right of the header). The poll loop in main.js
+   swaps .sync-online / .sync-offline on this element every tick; the
+   colour is driven from here, never from an inline style. */
+#sync_indicator.sync-online  { 
+    color:  var(--color-online); 
+}
+#sync_indicator.sync-offline { 
+    color:  var(--color-offline); 
 }
 
 /* ===========================================================

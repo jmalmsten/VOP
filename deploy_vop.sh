@@ -433,7 +433,7 @@ Before=vop.service
 
 [Service]
 Type=oneshot
-ExecStart=$LED_SETUP_SCRIPT
+ExecStart=/bin/bash $LED_SETUP_SCRIPT
 RemainAfterExit=yes
 
 [Install]

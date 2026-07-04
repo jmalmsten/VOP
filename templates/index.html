@@ -32,14 +32,14 @@
 <head>
     <meta charset="UTF-8">
     <title>VOP v0.16</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=4.21">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=50">
 </head>
 <body>
     <div class="container">
         
         <div class="vop-header">
             <!-- Page title -->
-            <h2>VOP v0.16.8</h2>
+            <h2>VOP v0.16.10</h2>
 
             <!-- Page navigation. Click to switch between Main
                  (job editor + status + xsheet) and Calibration
@@ -69,7 +69,7 @@
 
             <!-- Engine connection indicator. Lit when /status returns
                  valid data, dark when polling is failing. -->
-            <div id="sync_indicator">○ OFFLINE</div>
+            <div id="sync_indicator" class="sync-offline">○ OFFLINE</div>
         </div>
         <!-- Main page content wrapper. Everything from this point
              until the closing div before cheat-sheet inclusion is
@@ -539,7 +539,7 @@
         </div>
         <!-- {% include 'sections/cheat-sheet.html' %} -->
     </div>
-    <script src="{{ url_for('static', filename='main.js') }}?v=84"></script>
+    <script src="{{ url_for('static', filename='main.js') }}?v=85"></script>
     <!-- Page navigation handler. The Calibration page logic
              lives in main.js, but this small toggle is
              page-structural and stays here to avoid coupling
