@@ -527,42 +527,7 @@ def run_persistent_engine():
                     if 'slice_high' in prog:
                         prog['slice_high'].value = float(bracket.slice_high_norm)
                     
-                    # SWEEP (issue #230) UNIFORM SETUP
-                    #
-                    # sweep_pos is shared by all three layer passes in this
-                    # render - it's the smear clock, and there is exactly
-                    # one clock per rendered instant - so it's set once
-                    # here. The per-layer mode/width pairs are set by
-                    # set_sweep() immediately before each layer's geometry
-                    # pass below.
-                    #
-                    # Same hygiene contract as the slice uniforms above:
-                    # every render_world call defines the full sweep state
-                    # explicitly, and the multiply passes at the bottom
-                    # reset to Bypass, so the program object always LEAVES
-                    # render_world in the inert configuration. Idle /
-                    # branding / calibration renders that reuse prog
-                    # therefore never see a stale sweep.
-                    if 'sweep_pos' in prog:
-                        prog['sweep_pos'].value = float(max(0.0, min(1.0, t_norm)))
-
-                    def set_sweep(cfg):
-                        """Apply one layer's (mode_int, width) to the shader.
-
-                        Called with pm_sweep / bp1_sweep / bp2_sweep before
-                        the matching geometry pass, and with SWEEP_OFF
-                        before the multiply passes. 'in prog' guards for
-                        the same driver-paranoia reasons as everywhere
-                        else in this file.
-                        """
-                        mode_i, width = cfg
-                        if 'sweep_mode' in prog:
-                            prog['sweep_mode'].value = mode_i
-                        if 'sweep_width' in prog:
-                            prog['sweep_width'].value = width
-
-                    # The reset value for non-layer passes (FBO multiplies).
-                    SWEEP_OFF = (0, 0.0)
+                    
                 else:
                     if 'slice_active' in prog:
                         prog['slice_active'].value = False
@@ -570,6 +535,43 @@ def run_persistent_engine():
                         prog['slice_low'].value = 0.0
                     if 'slice_high' in prog:
                         prog['slice_high'].value = 1.0
+
+                # SWEEP (issue #230) UNIFORM SETUP
+                #
+                # sweep_pos is shared by all three layer passes in this
+                # render - it's the smear clock, and there is exactly
+                # one clock per rendered instant - so it's set once
+                # here. The per-layer mode/width pairs are set by
+                # set_sweep() immediately before each layer's geometry
+                # pass below.
+                #
+                # Same hygiene contract as the slice uniforms above:
+                # every render_world call defines the full sweep state
+                # explicitly, and the multiply passes at the bottom
+                # reset to Bypass, so the program object always LEAVES
+                # render_world in the inert configuration. Idle /
+                # branding / calibration renders that reuse prog
+                # therefore never see a stale sweep.
+                if 'sweep_pos' in prog:
+                    prog['sweep_pos'].value = float(max(0.0, min(1.0, t_norm)))
+
+                def set_sweep(cfg):
+                    """Apply one layer's (mode_int, width) to the shader.
+
+                    Called with pm_sweep / bp1_sweep / bp2_sweep before
+                    the matching geometry pass, and with SWEEP_OFF
+                    before the multiply passes. 'in prog' guards for
+                    the same driver-paranoia reasons as everywhere
+                    else in this file.
+                    """
+                    mode_i, width = cfg
+                    if 'sweep_mode' in prog:
+                        prog['sweep_mode'].value = mode_i
+                    if 'sweep_width' in prog:
+                        prog['sweep_width'].value = width
+
+                # The reset value for non-layer passes (FBO multiplies).
+                SWEEP_OFF = (0, 0.0)
 
                 # PER-FRAME STATE DISPATCH
                 #
