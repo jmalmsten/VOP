@@ -1011,7 +1011,11 @@ body.adm-mode .adm-step-row    { display: flex; }
     color:              var(--text-secondary); 
 }
 
-.c-box input { 
+/* Selects added to the selector (issue #230): the Sweep dropdowns are
+ * the first <select> elements to live inside a .c-box, and without
+ * this they fell through to the browser's default white widget while
+ * every .const-group select (Cam Res etc.) was already dark-themed. */
+.c-box input, .c-box select { 
     width:              100%; 
     background:         var(--bg-input-field);
     border:             1px solid var(--border-color); 
@@ -1027,6 +1031,7 @@ body.adm-mode .adm-step-row    { display: flex; }
 .const-group input:focus,
 .const-group select:focus,
 .c-box input:focus,
+.c-box select:focus,
 .sheet-row input:focus,
 .probe-input:focus {
     outline:        none;
