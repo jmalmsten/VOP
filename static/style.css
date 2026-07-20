@@ -1331,15 +1331,24 @@ body.adm-mode .adm-step-row    { display: flex; }
     display:            inline;
 }
 
-/* Stack the FIT FOV / FILL FOV buttons vertically with a small gap so 
- * they don't visually fuse together when they wrap. justify-content
- * right-aligns the stack inside its .c-box parent to align with the
- * other buttons in the upload-cluster row. */
-.fit-fill-stack {
+/* FIT FOV / FILL FOV side by side (issue #230). Was .fit-fill-stack
+ * (vertical); flattened to a row to free the space underneath for the
+ * Sweep controls without growing the group box. align-items flex-end
+ * bottom-aligns the buttons with the neighbouring labelled inputs,
+ * whose label eats their top edge. */
+.fit-fill-row {
     display:            flex;
-    flex-direction:     column;
+    flex-direction:     row;
     gap:                4px;
-    justify-content:    flex-end;
+    align-items:        flex-end;
+}
+
+/* Sweep control row (issue #230). Sits directly under the Ref Z /
+ * World Scale / FIT-FILL row inside the same group box. Deliberately
+ * tighter than .spaced (10px) - the two rows are one logical cluster,
+ * and the issue asks for the section not to get taller than needed. */
+.sweep-row {
+    margin-top:         4px;
 }
 
 /* Vertical gap between successive blocks inside a .group-box.

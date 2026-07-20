@@ -32,14 +32,14 @@
 <head>
     <meta charset="UTF-8">
     <title>VOP v0.16</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=50">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=51">
 </head>
 <body>
     <div class="container">
         
         <div class="vop-header">
             <!-- Page title -->
-            <h2>VOP v0.16.12</h2>
+            <h2>VOP v0.16.13</h2>
 
             <!-- Page navigation. Click to switch between Main
                  (job editor + status + xsheet) and Calibration
@@ -164,10 +164,32 @@
                     <div class="input-row spaced">
                         <div class="c-box"><label>Ref Z (Fit)</label><input type="number" step="0.1" id="fit_z" value="-1.0"></div>
                         <div class="c-box"><label>World Scale</label><input type="number" step="0.0001" id="coord_scale" value="1.0"></div>
-                        <div class="c-box fit-fill-stack">
+                        <!-- FIT/FILL side-by-side (issue #230): frees the row
+                             below for the Sweep controls without making the
+                             group box taller. -->
+                        <div class="c-box fit-fill-row">
                             <button class="mini-btn" onclick="calcFitScale('coord_scale', 'fit_z', 'proj', 'fit')" title="Scale image to fit entirely inside the projection frustum (letterbox/pillarbox)">FIT FOV</button>
                             <button class="mini-btn" onclick="calcFitScale('coord_scale', 'fit_z', 'proj', 'fill')" title="Scale image to fill the entire projection frustum (overflow on shorter axis)">FILL FOV</button>
                         </div>
+                    </div>
+                    <!-- SWEEP (issue #230). Luma-window filter that rides the
+                         smear clock: during an SSS/MDS exposure the window
+                         travels from below black to above white, showing each
+                         pixel as pure white only while its value is inside
+                         the window. Engine ignores these entirely in DRE/BRK
+                         modes. Ids match the job keys the engine reads
+                         (pm_sweep_mode / pm_sweep_width) so collectParams()
+                         persists them with zero mapping. -->
+                    <div class="input-row sweep-row">
+                        <div class="c-box"><label>Sweep</label>
+                            <select id="pm_sweep_mode" onchange="saveJob()" title="Luma-window sweep during smear exposures (SSS/MDS only). Bypass = off. HP = pixels above the traveling threshold show white. LP = pixels below show white. BP = only pixels inside the traveling band show white. Output is binary white/black, tintable via gels.">
+                                <option value="bypass">Bypass</option>
+                                <option value="hp">HP</option>
+                                <option value="bp">BP</option>
+                                <option value="lp">LP</option>
+                            </select>
+                        </div>
+                        <div class="c-box"><label>Width</label><input type="number" id="pm_sweep_width" value="0.1" min="0" max="1" step="0.01" onchange="saveJob()" title="Band half-width of the sweep window. 0.0 = knife edge / single value at a time. Larger = wider band = more overlap between instants. The sweep travels the extended range so every value gets equal dwell time - Width 1.0 is NOT a bypass, use Bypass for that."></div>
                     </div>
                 </div>
 
@@ -188,10 +210,32 @@
                     <div class="input-row spaced">
                         <div class="c-box"><label>Ref Z (Fit)</label><input type="number" step="0.1" id="bipack1_fit_z" value="-1.0"></div>
                         <div class="c-box"><label>World Scale</label><input type="number" step="0.0001" id="bipack1_coord_scale" value="1.0"></div>
-                        <div class="c-box fit-fill-stack">
-                            <button class="mini-btn" onclick="calcFitScale('bipack1_coord_scale', 'bipack1_fit_z', 'bipack1', 'fit')" title="Scale image to fit entirely inside the projection frustum (letterbox/pillarbox)">FIT FOV</button>
-                            <button class="mini-btn" onclick="calcFitScale('bipack1_coord_scale', 'bipack1_fit_z', 'bipack1', 'fill')" title="Scale image to fill the entire projection frustum (overflow on shorter axis)">FILL FOV</button>
+                        <!-- FIT/FILL side-by-side (issue #230): frees the row
+                             below for the Sweep controls without making the
+                             group box taller. -->
+                        <div class="c-box fit-fill-row">
+                            <button class="mini-btn" onclick="calcFitScale('coord_scale', 'fit_z', 'bipack1', 'fit')" title="Scale image to fit entirely inside the projection frustum (letterbox/pillarbox)">FIT FOV</button>
+                            <button class="mini-btn" onclick="calcFitScale('coord_scale', 'fit_z', 'bipack1', 'fill')" title="Scale image to fill the entire projection frustum (overflow on shorter axis)">FILL FOV</button>
                         </div>
+                    </div>
+                    <!-- SWEEP (issue #230). Luma-window filter that rides the
+                         smear clock: during an SSS/MDS exposure the window
+                         travels from below black to above white, showing each
+                         pixel as pure white only while its value is inside
+                         the window. Engine ignores these entirely in DRE/BRK
+                         modes. Ids match the job keys the engine reads
+                         (pm_sweep_mode / pm_sweep_width) so collectParams()
+                         persists them with zero mapping. -->
+                    <div class="input-row sweep-row">
+                        <div class="c-box"><label>Sweep</label>
+                            <select id="bipack1_sweep_mode" onchange="saveJob()" title="Luma-window sweep during smear exposures (SSS/MDS only). Bypass = off. HP = pixels above the traveling threshold show white. LP = pixels below show white. BP = only pixels inside the traveling band show white. Output is binary white/black, tintable via gels.">
+                                <option value="bypass">Bypass</option>
+                                <option value="hp">HP</option>
+                                <option value="bp">BP</option>
+                                <option value="lp">LP</option>
+                            </select>
+                        </div>
+                        <div class="c-box"><label>Width</label><input type="number" id="bipack1_sweep_width" value="0.1" min="0" max="1" step="0.01" onchange="saveJob()" title="Band half-width of the sweep window. 0.0 = knife edge / single value at a time. Larger = wider band = more overlap between instants. The sweep travels the extended range so every value gets equal dwell time - Width 1.0 is NOT a bypass, use Bypass for that."></div>
                     </div>
                 </div>
 
@@ -212,10 +256,32 @@
                     <div class="input-row spaced">
                         <div class="c-box"><label>Ref Z (Fit)</label><input type="number" step="0.1" id="bipack2_fit_z" value="-1.0"></div>
                         <div class="c-box"><label>World Scale</label><input type="number" step="0.0001" id="bipack2_coord_scale" value="1.0"></div>
-                        <div class="c-box fit-fill-stack">
-                            <button class="mini-btn" onclick="calcFitScale('bipack2_coord_scale', 'bipack2_fit_z', 'bipack2', 'fit')" title="Scale image to fit entirely inside the projection frustum (letterbox/pillarbox)">FIT FOV</button>
-                            <button class="mini-btn" onclick="calcFitScale('bipack2_coord_scale', 'bipack2_fit_z', 'bipack2', 'fill')" title="Scale image to fill the entire projection frustum (overflow on shorter axis)">FILL FOV</button>
+                        <!-- FIT/FILL side-by-side (issue #230): frees the row
+                             below for the Sweep controls without making the
+                             group box taller. -->
+                        <div class="c-box fit-fill-row">
+                            <button class="mini-btn" onclick="calcFitScale('coord_scale', 'fit_z', 'bipack2', 'fit')" title="Scale image to fit entirely inside the projection frustum (letterbox/pillarbox)">FIT FOV</button>
+                            <button class="mini-btn" onclick="calcFitScale('coord_scale', 'fit_z', 'bipack2', 'fill')" title="Scale image to fill the entire projection frustum (overflow on shorter axis)">FILL FOV</button>
                         </div>
+                    </div>
+                    <!-- SWEEP (issue #230). Luma-window filter that rides the
+                         smear clock: during an SSS/MDS exposure the window
+                         travels from below black to above white, showing each
+                         pixel as pure white only while its value is inside
+                         the window. Engine ignores these entirely in DRE/BRK
+                         modes. Ids match the job keys the engine reads
+                         (pm_sweep_mode / pm_sweep_width) so collectParams()
+                         persists them with zero mapping. -->
+                    <div class="input-row sweep-row">
+                        <div class="c-box"><label>Sweep</label>
+                            <select id="bipack2_sweep_mode" onchange="saveJob()" title="Luma-window sweep during smear exposures (SSS/MDS only). Bypass = off. HP = pixels above the traveling threshold show white. LP = pixels below show white. BP = only pixels inside the traveling band show white. Output is binary white/black, tintable via gels.">
+                                <option value="bypass">Bypass</option>
+                                <option value="hp">HP</option>
+                                <option value="bp">BP</option>
+                                <option value="lp">LP</option>
+                            </select>
+                        </div>
+                        <div class="c-box"><label>Width</label><input type="number" id="bipack2_sweep_width" value="0.1" min="0" max="1" step="0.01" onchange="saveJob()" title="Band half-width of the sweep window. 0.0 = knife edge / single value at a time. Larger = wider band = more overlap between instants. The sweep travels the extended range so every value gets equal dwell time - Width 1.0 is NOT a bypass, use Bypass for that."></div>
                     </div>
                 </div>
             </div>
