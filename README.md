@@ -1,10 +1,21 @@
 > ⚠️ **DISCLAIMER - The GitHub repo is a read only mirror of [VOP on Codeberg](https://codeberg.org/jmalmsten-com/VOP).**
+---
+
+>
+> **REGARDING LLM USE**
+> 
+> In light of the recent Codeberg TOS addition [regarding use of LLM's on Codeberg repos](https://blog.codeberg.org/protecting-our-floss-commons-from-llms.html), this repo will be somewhat paused as I will have to change my workflow for how I continue this whole project. I do not want to fight Codeberg on this, and I am not going to. Because I cannot with good conscious win it, even if I could. Which I do not think I can anyway.
+>
+> If a moderator of Codeberg sees this. I am looking at the repo myself. Actively distancing it from LLM use. I like Codeberg. I want to continue being here. So I'll do what is required to do so. 
+---
+
+
 > 
 > **All development, issues, pull requests, discussions, releases, and wiki** happen on Codeberg.
 > GitHub features are actively **disabled or ignored**.
 
 > [!IMPORTANT]
-> **USE AT YOUR OWN RISK.** - This project is a learning experiment. If you brick your hardware, I cannot provide support outside of what has worked for me. Run this code only if you accept the risks of experimental software. And while this Flask Web application **CAN** be exposed on the public internet. I **HIGHLY** recommend doing it through a VPN instead if you want to reach it from outside.
+> This project is a learning experiment. I cannot provide support outside of what has worked for me. Run this code only if you accept the risks of experimental software. And while this Flask Web application **CAN** be exposed on the public internet. I **HIGHLY** recommend doing it through a VPN instead if you want to reach it from outside.
 
 ![VOP Logo](static/VOP-Graphic.png)
 ---
@@ -19,11 +30,11 @@ Click the image below to play the playlist where I gather things regarding the V
 
 ### What does it aim to do?
 
-In essence. In its simplest form. It takes an input image. And "projects" it onto an HDMI screen in a virtual 3D plane. And during a long exposure, the camera sensor records the light coming off that HDMI screen to a frame that's saved in a folder called CamMag. This image is saved as a 16 bit linear color tiff. And if you do another exposure and target that same tiff. The VOP will merge the two using additive mix. This additive workflow is named LIME (Latent Image Multiple Exposures) and is designed to mimic real world film workflows where exposing the frame in the camera to light adds it to the existing latent image.
+In essence. In its simplest form. It takes an input image. And "projects" it onto an HDMI screen in a virtual 3D plane. And during a long exposure, the camera sensor records the light coming off that HDMI screen to a frame that's saved in a folder called CamMag. This image is saved as a 16 bit linear color tiff. And if you do another exposure and target that same tiff. The VOP will merge the two using additive mix. This additive workflow is named [LIME (Latent Image Multiple Exposures)](https://codeberg.org/jmalmsten-com/VOP/wiki/LIME) and is designed to mimic real world film workflows where exposing the frame in the camera to light adds it to the existing latent image.
 
-This is all orchestrated with an exposure sheet to make a sequence of TIFFS or ProRes444. That sequence can then be moved to a desktop for further digital compositing and NLE work.
+This is all orchestrated with an exposure sheet to make a sequence of TIFFS or ProRes444. That sequence or .mov can then be moved to a desktop for further digital compositing and NLE work.
 
-With the LIME system, the ability to bipack multiple 3D planes and the exposure sheet (three in total). You can achieve slitscan animation, compositing and optical image processing. And whatever the user dreams up within the VOP's capabilities.
+With the **LIME** system, the ability to bipack multiple 3D planes and the exposure sheet (three in total). You can achieve slitscan animation, compositing and optical image processing. And whatever the user dreams up within the VOP's capabilities.
 
 ### Who is this intended to be used by?
 Mainly... me. I'm just putting this on a public repo in case someone out there with a madness similar to mine stumbles upon it and wants to explore this particular workflow.  
@@ -32,36 +43,35 @@ Mainly... me. I'm just putting this on a public repo in case someone out there w
 
 ---
 
-
-> [!NOTE]
-> ## TLDR
->
-> ### Top Technical Features
-> - **16-bit Pipeline:** All processing is done in 16-bit linear color space in TIFF sequences for maximum math accuracy and dynamic range.
-> - **Motion Blur:** Move artwork on-screen during exposure to create physical light smears.
-> - **Smear:** Smear and extrude like an 80's title sequence.
-> - **Virtual Gels & BiPacks:** Use digital mattes and color overlays to simulate traditional optical effects.
-> - **Three Layers Per Exposure:** for each exposure, up to three layers of artwork can be used, they live in their own 3D space, and the 2D planes transforms are rendered into 2D images that are then multiplied together for exposure.
-> - **Multiple Exposures:** To combine passes, the VOP uses LIME (see above).
-> - **Anamorphic Workflow:** In order to maximize the pixels recorded on the camera, the VOP can use non-square pixels in it's math that can then be accounted for at playback or in your NLE/Compositor.
-> - **Animation Desk Mode (ADM)**: A rudimentary function set aimed to make the VOP able to be run manually frame by frame for shooting animations of things between the camera lens and the projection monitor.
-> - **Video I/O:** Video files can be uploaded to the VOP both on the Camera and Projector side. When a compatible video file is ingested using ffmpeg, it's converted into a sequence of TIFFs. And you can use that sequence with the step printing functionality of the VOP. When a job is finished, a low bitrate h264 workprint is generated for quick review, and a high quality ProRes4444 can be generated as well for easier post work.
-> - **Notifications:** As a single job can take multiple hours, a [ntfy server](https://github.com/binwiederhier/ntfy) is included in the deployment script so you can subscribe to it inside your LAN with a free phone app and be notified when a job has finished or failed.
-> 
-> ### Hardware needed:
-> - **Raspberry Pi 5 or 4 (4GB+)** - The VOP is lightweight, typically using <1GB of RAM  
-> - **Raspberry Pi Camera HQ** - (IMX477) with appropriate lens.
-> - **Storage with Raspberry Pi OS Lite (64 bit)** - SD card or USB3.2 Solid State Flash Drive. The faster, the better for handling the big TIFF files.
-> - **HDMI Monitor** - Preferably an OLED (although the [black crush system](https://codeberg.org/jmalmsten-com/VOP/wiki/NoiseCrush) introduced in v0.6.3 helps a lot here for cheaper screens). The VOP uses EDID handshake to get the screens resolution for projection output. So pretty much any HDMI screen that the host Pi can handle should work. I used it successfully on a standard 16:9 1920x1080 screen and I now use a 3:2 2160x1440 screen in my prototype. 
-> - **Device for control** - the VOP is controlled with a web interface, pretty much any modern web browser on a modern OS works as long as it's on the same network (though I would love to see it work on an Amiga 2000 if anyone has the knowhow). I recommend having the browser on a screen at at least 1920x1080.
-> ## Regarding other cameras and film workflows
-> The question has come up a few times if this system can use a film camera (like, Super8 and 16mm) and communicate with solutions for film based optical printers. And I have to say that it's not currently a feature. And as I myself don't have a working motion film camera and I don't have the economic means to experiment on that front, it's not a feature I can prioritize for implementation. You are however, welcome to fork this project and even suggest code to make it work. 
-> ## Installation and use
-> Check the Wiki for current instructions that should work. At least, it has worked for me. 
-> - [wiki/tutorials](https://codeberg.org/jmalmsten-com/VOP/wiki/Tutorials_main)
+### Top Technical Features
+- **16-bit Pipeline:** All processing is done in 16-bit linear color space in TIFF sequences for maximum math accuracy and dynamic range.
+- **Motion Blur:** Move artwork on-screen in 3D space during exposure to create physical light smears.
+- **Smear:** Smear and extrude like an 80's title sequence.
+- **Virtual Gels & BiPacks:** Use digital mattes and color overlays to simulate traditional optical effects.
+- **Three Layers Per Exposure:** for each exposure, up to three layers of artwork can be used, they live in their own 3D space, and the 2D planes transforms are rendered into 2D images that are then multiplied together for exposure.
+- **Multiple Exposures:** To combine passes, the VOP uses LIME (see above).
+- **Anamorphic Workflow:** In order to maximize the pixels recorded on the camera, the VOP can use non-square pixels in it's math that can then be accounted for at playback or in your NLE/Compositor.
+- **Animation Desk Mode (ADM)**: A rudimentary function set aimed to make the VOP able to be run manually frame by frame for shooting animations of things between the camera lens and the projection monitor.
+- **Filter Sweep Mode** - by doing a sweep of the brightness values of pixels as a mask during a smear, we can use depth-maps to get 3D displacement effects. 
+- **Video I/O:** Video files can be uploaded to the VOP both on the Camera and Projector side. When a compatible video file is ingested using ffmpeg, it's converted into a sequence of TIFFs. And you can use that sequence with the step printing functionality of the VOP. When a job is finished, a low bitrate h264 workprint is generated for quick review, and a high quality ProRes4444 can be generated as well for easier post work.
+- **Notifications:** As a single job can take multiple hours, a [ntfy server](https://github.com/binwiederhier/ntfy) is included in the deployment script so you can subscribe to it inside your LAN with a free phone app and be notified when a job has finished or failed.
+ 
+### Hardware needed:
+- **Raspberry Pi 5 or 4 (4GB+)** - The VOP is lightweight, typically using <1GB of RAM  
+- **Raspberry Pi Camera HQ** - (IMX477) with appropriate lens.
+- **Storage with Raspberry Pi OS Lite (64 bit)** - SD card or USB3.2 Solid State Flash Drive. The faster, the better for handling the big TIFF files.
+- **HDMI Monitor** - Preferably an OLED (although the [black crush system](https://codeberg.org/jmalmsten-com/VOP/wiki/NoiseCrush) introduced in v0.6.3 helps a lot here for cheaper screens). The VOP uses EDID handshake to get the screens resolution for projection output. So pretty much any HDMI screen that the host Pi can handle should work. I used it successfully on a standard 16:9 1920x1080 screen and I now use a 3:2 2160x1440 screen in my prototype. 
+- **Device for control** - the VOP is controlled with a web interface, pretty much any modern web browser on a modern OS works as long as it's on the same network (though I would love to see it work on an Amiga 2000 if anyone has the knowhow). I recommend having the browser on a screen at at least 1920x1080.
+## Regarding other cameras and film workflows
+The question has come up a few times if this system can use a film camera (like, Super8 and 16mm) and communicate with solutions for film based optical printers. And I have to say that it's not currently a feature. And as I myself don't have a working motion film camera and I don't have the economic means to experiment on that front, it's not a feature I can prioritize for implementation. You are however, welcome to fork this project and even suggest code to make it work. 
+## Installation and use
+Check the Wiki for current instructions that should work. At least, it has worked for me. 
+- [wiki/tutorials](https://codeberg.org/jmalmsten-com/VOP/wiki/Tutorials_main)
 
 # Contributing
 Please report bugs or suggest improvements via **[ISSUES](https://codeberg.org/jmalmsten-com/VOP/issues)**. As this is a personal project, I will filter out what doesn't fit the intended workflow of the VOP, but I welcome suggestions, bug reports and solutions I have yet to think of!
+
+Also see Wiki for more about [contributions](https://codeberg.org/jmalmsten-com/VOP/wiki/Contributing).
 
 **License:** This project is open-source under the [AGPL-3.0 License](LICENSE).
 

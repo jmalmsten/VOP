@@ -87,6 +87,23 @@ def init_render_pipeline():
     uniform float slice_low;
     uniform float slice_high;
 
+    // SWEEP uniforms (issue #230).
+    // sweep_mode selects the luma-window filter applied to this
+    // layer's pass: 0 = Bypass (default, shader behaves exactly
+    // as pre-sweep), 1 = High Pass, 2 = Band Pass, 3 = Low Pass.
+    // Ints rather than a bool-per-mode so one uniform carries the
+    // whole dropdown state.
+    //
+    // sweep_pos is the normalized sweep progress in [0..1]. The
+    // engine feeds it t_norm, i.e. the smear progress within the
+    // open-shutter window - the sweep rides the smear clock.
+    //
+    // sweep_width is the band half-width ("Width" in the GUI).
+    // 0.0 = knife edge / infinitesimal band; larger = wider.
+    uniform int sweep_mode;
+    uniform float sweep_pos;
+    uniform float sweep_width;
+
     in vec2 v_tex;
     out vec4 f_color;
 
@@ -105,6 +122,51 @@ def init_render_pipeline():
         if (slice_active) {
             float slice_width = slice_high - slice_low;
             tex_col.rgb = clamp((tex_col.rgb - slice_low) / slice_width, 0.0, 1.0);
+        }
+
+        // SWEEP LUMA-WINDOW FILTER (issue #230)
+        //
+        // Runs AFTER the BRK slice remap (so it sees the same
+        // values the panel would show) and BEFORE the gel
+        // multiply (so PG/CG can still tint the resulting
+        // wipe - the sweep produces "bare bulb through a
+        // stencil", and gels gel that light like any other).
+        //
+        // The band center c travels the EXTENDED range
+        // [-W .. 1+W] as sweep_pos goes 0 -> 1, so the band
+        // fully enters and fully exits the luma range. Every
+        // pixel value therefore gets EQUAL dwell time across
+        // the sweep - important for the depth-map pseudo-3D
+        // workflow where uneven dwell would underexpose the
+        // nearest/farthest slices. Deliberate consequence:
+        // Width=1.0 is NOT a perfect bypass (use Bypass for
+        // that).
+        //
+        // Output is BINARY white/black by design: the filter
+        // answers "is this pixel's value inside the window",
+        // it does not pass the pixel's own color through.
+        if (sweep_mode != 0) {
+            // Rec.601 luma - the same weights mono_mode uses,
+            // so a grayscale depth map reads identically in
+            // both paths.
+            float luma = dot(tex_col.rgb, vec3(0.299, 0.587, 0.114));
+
+            float w = sweep_width;
+            float c = -w + sweep_pos * (1.0 + 2.0 * w);
+
+            // One band definition serves all three modes:
+            // band = [c - w, c + w]. HP looks only at the
+            // lower edge, LP only at the upper, BP at both.
+            // step(edge, x) is 1.0 when x >= edge.
+            float above_lo = step(c - w, luma);   // luma >= lower edge
+            float below_hi = 1.0 - step(c + w + 1e-6, luma); // luma <= upper edge
+
+            float lit;
+            if (sweep_mode == 1)      lit = above_lo;              // HP
+            else if (sweep_mode == 3) lit = below_hi;              // LP
+            else                      lit = above_lo * below_hi;   // BP
+
+            tex_col.rgb = vec3(lit);
         }
 
         // MONOCHROME PATH (unchanged from before)
@@ -141,6 +203,22 @@ def init_render_pipeline():
         prog['slice_low'].value = 0.0
     if 'slice_high' in prog:
         prog['slice_high'].value = 1.0
+    
+    # SWEEP defaults (issue #230): initialize to Bypass so every
+    # code path that never touches the sweep uniforms - idle
+    # branding, calibration, DRE, BRK, previews, everything -
+    # renders exactly as it did before the sweep existed. The
+    # engine's render_world sets these per-layer per-pass for
+    # SSS/MDS only. Same 'in prog' guard rationale as the slice
+    # defaults above: a missing uniform defaults to 0/false in
+    # GLSL, which is precisely the Bypass configuration, so even
+    # a driver that strips them leaves us safe.
+    if 'sweep_mode' in prog:
+        prog['sweep_mode'].value = 0
+    if 'sweep_pos' in prog:
+        prog['sweep_pos'].value = 0.0
+    if 'sweep_width' in prog:
+        prog['sweep_width'].value = 0.0
 
     verts = np.array([
         -1.0,  1.0, 0.0, 1.0,

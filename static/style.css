@@ -85,6 +85,9 @@ Description:        Stylings for the whole GUI
     --color-success:        #080;       /* Execute Sequence button background */
     --color-panic:          #800;       /* Hardware Panic button */
 
+    --color-online:         #0f0;       /* Sync indicator: Pi web server reachable  */
+    --color-offline:        #f44;       /* Sync indicator: polling is failing 
+
     /* >>> Background & Panels <<< */
 
     --bg-body:              #070707;                /* Background for the whole thing */
@@ -249,6 +252,16 @@ body {
     justify-content:    space-between; 
     align-items:        center; 
     border-bottom:      1px solid var(--border-color); 
+}
+
+/* Sync indicator (top-right of the header). The poll loop in main.js
+   swaps .sync-online / .sync-offline on this element every tick; the
+   colour is driven from here, never from an inline style. */
+#sync_indicator.sync-online  { 
+    color:  var(--color-online); 
+}
+#sync_indicator.sync-offline { 
+    color:  var(--color-offline); 
 }
 
 /* ===========================================================
@@ -998,7 +1011,11 @@ body.adm-mode .adm-step-row    { display: flex; }
     color:              var(--text-secondary); 
 }
 
-.c-box input { 
+/* Selects added to the selector (issue #230): the Sweep dropdowns are
+ * the first <select> elements to live inside a .c-box, and without
+ * this they fell through to the browser's default white widget while
+ * every .const-group select (Cam Res etc.) was already dark-themed. */
+.c-box input, .c-box select { 
     width:              100%; 
     background:         var(--bg-input-field);
     border:             1px solid var(--border-color); 
@@ -1014,6 +1031,7 @@ body.adm-mode .adm-step-row    { display: flex; }
 .const-group input:focus,
 .const-group select:focus,
 .c-box input:focus,
+.c-box select:focus,
 .sheet-row input:focus,
 .probe-input:focus {
     outline:        none;
@@ -1318,15 +1336,24 @@ body.adm-mode .adm-step-row    { display: flex; }
     display:            inline;
 }
 
-/* Stack the FIT FOV / FILL FOV buttons vertically with a small gap so 
- * they don't visually fuse together when they wrap. justify-content
- * right-aligns the stack inside its .c-box parent to align with the
- * other buttons in the upload-cluster row. */
-.fit-fill-stack {
+/* FIT FOV / FILL FOV side by side (issue #230). Was .fit-fill-stack
+ * (vertical); flattened to a row to free the space underneath for the
+ * Sweep controls without growing the group box. align-items flex-end
+ * bottom-aligns the buttons with the neighbouring labelled inputs,
+ * whose label eats their top edge. */
+.fit-fill-row {
     display:            flex;
-    flex-direction:     column;
+    flex-direction:     row;
     gap:                4px;
-    justify-content:    flex-end;
+    align-items:        flex-end;
+}
+
+/* Sweep control row (issue #230). Sits directly under the Ref Z /
+ * World Scale / FIT-FILL row inside the same group box. Deliberately
+ * tighter than .spaced (10px) - the two rows are one logical cluster,
+ * and the issue asks for the section not to get taller than needed. */
+.sweep-row {
+    margin-top:         4px;
 }
 
 /* Vertical gap between successive blocks inside a .group-box.

@@ -390,6 +390,50 @@ def run_persistent_engine():
             bp2_scale = float(job_data.get('bipack2_coord_scale', 1.0))
 
             # ---------------------------------------------------------
+            # SWEEP (issue #230) PER-LAYER CONFIG
+            # Read once per task, like the world scales above, so the
+            # per-frame render loop never touches job_data for these.
+            #
+            # MODE GATE: the sweep is defined only for the smear modes
+            # (SSS / MDS) - it rides t_norm, the smear clock, which
+            # DRE and BRK hold steady. Rather than teaching every
+            # downstream pass about modes, we resolve the gate HERE:
+            # in a non-smear mode every layer's config collapses to
+            # (Bypass, 0.0) regardless of what the GUI fields say,
+            # and the rest of the pipeline stays mode-blind.
+            # ---------------------------------------------------------
+            # GUI dropdown string -> shader uniform int. Unknown or
+            # missing values fall back to 0 (Bypass) - a job saved
+            # before this feature existed has no sweep keys at all
+            # and must render exactly as it always did.
+            _SWEEP_MODE_MAP = {'bypass': 0, 'hp': 1, 'bp': 2, 'lp': 3}
+            _sweep_gate = timeline.mode in ('sss', 'mds')
+
+            def _read_sweep(prefix):
+                """Resolve one layer's (mode_int, width) from job_data.
+
+                prefix is the layer's job-key prefix: 'pm_',
+                'bipack1_' or 'bipack2_'. Keys are <prefix>sweep_mode
+                and <prefix>sweep_width, matching the GUI element ids
+                so collectParams() persists them with zero mapping.
+                Width is clamped to [0..1]: 0 = knife edge, 1 = max.
+                """
+                if not _sweep_gate:
+                    return (0, 0.0)
+                mode_i = _SWEEP_MODE_MAP.get(
+                    str(job_data.get(prefix + 'sweep_mode', 'bypass')).lower(), 0)
+                try:
+                    width = float(job_data.get(prefix + 'sweep_width', 0.0) or 0.0)
+                except (TypeError, ValueError):
+                    width = 0.0
+                width = max(0.0, min(1.0, width))
+                return (mode_i, width)
+
+            pm_sweep  = _read_sweep('pm_')
+            bp1_sweep = _read_sweep('bipack1_')
+            bp2_sweep = _read_sweep('bipack2_')
+
+            # ---------------------------------------------------------
             # ANAMORPHIC PAR (Pixel Aspect Ratio) RESOLUTION
             # Read once per task to avoid redundant dict lookups during the
             # per-frame render loop. The preview-unsqueeze toggle is consumed
@@ -482,6 +526,8 @@ def run_persistent_engine():
                         prog['slice_low'].value = float(bracket.slice_low_norm)
                     if 'slice_high' in prog:
                         prog['slice_high'].value = float(bracket.slice_high_norm)
+                    
+                    
                 else:
                     if 'slice_active' in prog:
                         prog['slice_active'].value = False
@@ -489,6 +535,43 @@ def run_persistent_engine():
                         prog['slice_low'].value = 0.0
                     if 'slice_high' in prog:
                         prog['slice_high'].value = 1.0
+
+                # SWEEP (issue #230) UNIFORM SETUP
+                #
+                # sweep_pos is shared by all three layer passes in this
+                # render - it's the smear clock, and there is exactly
+                # one clock per rendered instant - so it's set once
+                # here. The per-layer mode/width pairs are set by
+                # set_sweep() immediately before each layer's geometry
+                # pass below.
+                #
+                # Same hygiene contract as the slice uniforms above:
+                # every render_world call defines the full sweep state
+                # explicitly, and the multiply passes at the bottom
+                # reset to Bypass, so the program object always LEAVES
+                # render_world in the inert configuration. Idle /
+                # branding / calibration renders that reuse prog
+                # therefore never see a stale sweep.
+                if 'sweep_pos' in prog:
+                    prog['sweep_pos'].value = float(max(0.0, min(1.0, t_norm)))
+
+                def set_sweep(cfg):
+                    """Apply one layer's (mode_int, width) to the shader.
+
+                    Called with pm_sweep / bp1_sweep / bp2_sweep before
+                    the matching geometry pass, and with SWEEP_OFF
+                    before the multiply passes. 'in prog' guards for
+                    the same driver-paranoia reasons as everywhere
+                    else in this file.
+                    """
+                    mode_i, width = cfg
+                    if 'sweep_mode' in prog:
+                        prog['sweep_mode'].value = mode_i
+                    if 'sweep_width' in prog:
+                        prog['sweep_width'].value = width
+
+                # The reset value for non-layer passes (FBO multiplies).
+                SWEEP_OFF = (0, 0.0)
 
                 # PER-FRAME STATE DISPATCH
                 #
@@ -580,7 +663,7 @@ def run_persistent_engine():
                     
                 bg_color = (0.1, 0.1, 0.1, 1.0) if is_preview else (0.0, 0.0, 0.0, 1.0)
 
-                def render_bipack_to_fbo(fbo, tex, asp, world_scale, mst_p, mst_r, lcl_p, lcl_r):
+                def render_bipack_to_fbo(fbo, tex, asp, world_scale, mst_p, mst_r, lcl_p, lcl_r, sweep_cfg):
                     """
                     Renders one bipack layer into its dedicated off-screen FBO.
                     
@@ -604,16 +687,23 @@ def run_persistent_engine():
                         rot_order=rot_order)
                     prog['mvp'].write(mvp)
                     prog['filter_color'].write(np.array([1.0, 1.0, 1.0], dtype='f4'))
+                    # SWEEP (issue #230): this layer's luma-window
+                    # filter. Bypass tuple when the layer's dropdown
+                    # says so, when the mode gate (DRE/BRK) zeroed the
+                    # config at task setup, or via SWEEP_OFF resets.
+                    set_sweep(sweep_cfg)
                     tex.use(0)
                     vao.render(moderngl.TRIANGLE_STRIP)
 
                 # PASS 1: RENDER BIPACK 1 INTO OFF-SCREEN FBO
                 render_bipack_to_fbo(bp1_fbo, tex_bp1, asp_bp1, bp1_scale,
-                                     st['bp1_p'], st['bp1_r'], st['lbp1_p'], st['lbp1_r'])
+                                     st['bp1_p'], st['bp1_r'], st['lbp1_p'], st['lbp1_r'],
+                                     bp1_sweep)
 
                 # PASS 2: RENDER BIPACK 2 INTO OFF-SCREEN FBO
                 render_bipack_to_fbo(bp2_fbo, tex_bp2, asp_bp2, bp2_scale,
-                                     st['bp2_p'], st['bp2_r'], st['lbp2_p'], st['lbp2_r'])
+                                     st['bp2_p'], st['bp2_r'], st['lbp2_p'], st['lbp2_r'],
+                                     bp2_sweep)
 
                 # PASS 3: RENDER PM TO THE ACTUAL SCREEN
                 ctx.screen.use()
@@ -628,6 +718,17 @@ def run_persistent_engine():
                 
                 prog['mvp'].write(mvp_mag)
                 prog['filter_color'].write(st['pg'].astype('f4'))
+
+                # SWEEP (issue #230): PM layer's filter. Note this runs
+                # even when tex_mag is the white pass-through (closed
+                # eye) - the PM pass, unlike the bipack FBO path, still
+                # draws a quad in that case. A sweep on an all-white
+                # texture: luma is 1.0 everywhere, so HP lights the
+                # whole frame once the band's lower edge drops below
+                # 1.0 and LP/BP strobe it - a bare-bulb flash gag, not
+                # a bug. Harmless, and arguably a feature.
+                set_sweep(pm_sweep)
+
                 tex_mag.use(0)
                 vao.render(moderngl.TRIANGLE_STRIP)
                 
@@ -640,6 +741,16 @@ def run_persistent_engine():
                 ctx.blend_func = (moderngl.DST_COLOR, moderngl.ZERO)
                 prog['mvp'].write(np.eye(4, dtype='f4').tobytes())
                 prog['filter_color'].write(np.array([1.0, 1.0, 1.0], dtype='f4'))
+
+                # SWEEP (issue #230): MUST be Bypass here. These two
+                # draws composite the already-rendered bipack FBOs
+                # over the screen; a live sweep would re-filter the
+                # filtered result (and mangle non-swept layers too).
+                # This is also what guarantees prog exits render_world
+                # in the inert sweep state - see the hygiene note at
+                # the top of the function.
+                set_sweep(SWEEP_OFF)
+
                 bp1_tex.use(0)
                 vao.render(moderngl.TRIANGLE_STRIP)
                 bp2_tex.use(0)
@@ -766,7 +877,7 @@ def run_persistent_engine():
                 # ---------------------------------------------------------
                 
                 log_audit(f"[{datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}] EXPOSURE {frame_num} | HDMI sequence complete. Waiting for camera file IO.")
-                cam_proc.wait()
+                hw.finish_capture(cam_proc)
                 
                 # Delegate to the shared post-capture helper. Centralizes 
                 # the three preview / commit branches so the DRE path 
@@ -780,7 +891,7 @@ def run_persistent_engine():
                 Shared post-capture pipeline for both execute_exposure (SSS/MDS) 
                 and execute_dre_exposure (DRE) paths.
                 
-                After cam_proc.wait() returns, the DNG is on disk and the camera 
+                After hw.finish_capture(cam_proc) returns, the DNG is on disk and the camera 
                 doesn't care what kind of HDMI animation produced it. The three 
                 downstream paths (comp_preview / cam_preview / real exposure) 
                 are mode-agnostic, so we share one implementation.
@@ -1072,7 +1183,7 @@ def run_persistent_engine():
                 pygame.display.flip()
                 
                 log_audit(f"[{datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}] DRE-EXPOSURE {frame_num} | DRE sequence complete. Waiting for camera file IO.")
-                cam_proc.wait()
+                hw.finish_capture(cam_proc)
                 
                 # Delegate to the shared post-capture helper (same one 
                 # execute_exposure uses for SSS/MDS). The camera doesn't 
@@ -1434,7 +1545,7 @@ def run_persistent_engine():
                         ctx.finish()
                         pygame.display.flip()
 
-                        cam_proc.wait()
+                        hw.finish_capture(cam_proc)
                         captured_files.append(bracket_buf)
                         log_audit(
                             f"[{datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}] "
@@ -1873,7 +1984,7 @@ def run_persistent_engine():
                                                   job_data.get('cam_res', '2028x1520'))
                     hw.wait_for_sensor_prime()
                     time.sleep(total_ms / 1000.0) 
-                    cam_proc.wait()
+                    hw.finish_capture(cam_proc)
 
                     noise_val = cutil.measure_noise_floor(buf_f, static_dir)
                     log_audit(f">>> RECOMMENDED BLACK CLIP: {noise_val:.6f} <<<")
@@ -1929,7 +2040,7 @@ def run_persistent_engine():
                     )
                     hw.wait_for_sensor_prime()
                     time.sleep(total_ms / 1000.0)
-                    cam_proc.wait()
+                    hw.finish_capture(cam_proc)
 
                     # Centre-weighted brightness in [0.0, 1.0]. This
                     # writes probe_live.jpg as a side effect, so the
@@ -2056,7 +2167,7 @@ def run_persistent_engine():
                         )
                         hw.wait_for_sensor_prime()
                         time.sleep(total_ms / 1000.0)
-                        cam_proc.wait()
+                        hw.finish_capture(cam_proc)
 
                         return cutil.measure_centre_brightness(
                             buf_f, static_dir, return_dict=True
@@ -2251,7 +2362,7 @@ def run_persistent_engine():
                     )
                     hw.wait_for_sensor_prime()
                     time.sleep(total_ms / 1000.0)
-                    cam_proc.wait()
+                    hw.finish_capture(cam_proc)
 
                     # We want the dict form so we have per-channel
                     # info in the audit log - lets the user see if
@@ -2368,7 +2479,7 @@ def run_persistent_engine():
                         )
                         hw.wait_for_sensor_prime()
                         time.sleep(total_ms / 1000.0)
-                        cam_proc.wait()
+                        hw.finish_capture(cam_proc)
                         return cutil.measure_centre_brightness(
                             buf_f, static_dir, return_dict=True
                         )
@@ -2564,7 +2675,7 @@ def run_persistent_engine():
                                                   job_data.get('cam_res', '2028x1520'))
                     hw.wait_for_sensor_prime()
                     time.sleep(total_ms /1000.0)
-                    cam_proc.wait()
+                    hw.finish_capture(cam_proc)
                     
                     hp_count = cutil.map_hot_pixels(buf_f, static_dir)
                     if hp_count >= 0:
