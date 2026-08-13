@@ -26,6 +26,9 @@ Other, more abstract use-cases are of course possible. But that's the most pract
 ### #233 - Move LAB / INVERT button to CAM MAG section
 It just fits better there considering what it does. 
 
+### #235 - Move Noise crusher and Hot pixel mapper back to main
+As these are both settings that need to be fine tuned per job, it should be on the main page. 
+
 ## Fixed:
 ### The ONLINE indicator didn't work
 fixed.
