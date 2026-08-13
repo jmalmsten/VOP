@@ -837,7 +837,8 @@ function addMDSKeyframe() {
             <div></div>
             <div></div>
             <div></div>
-        </div>`;
+        </div>
+        <hr>`;
     body.appendChild(row);
     reindexMDS();
 }
