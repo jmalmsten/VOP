@@ -54,3 +54,4 @@ vop_dump*.txt
 static/noise_data.json
 static/calibration.json
 static/probe_live.jpg
+static/hot_pixels.json
