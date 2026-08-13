@@ -37,11 +37,14 @@ sudo systemctl stop vop
 # 2. Fetch from git to make sure the local copy knows of any changes.
 git fetch --all
 
-# 2. Pull the latest nightly commit
+# 3. Force it to latest main
+git reset --hard origin/main
+
+# 4. Pull the latest main commit
 git pull origin main
 
-# 3. run the VOP as a service daemon
+# 5. run the VOP as a service daemon
 sudo systemctl start vop
 
-# 4. Show the logs
+# 6. Show the logs
 journalctl -u vop -f
