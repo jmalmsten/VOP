@@ -838,7 +838,7 @@ function addMDSKeyframe() {
             <div></div>
             <div></div>
         </div>
-        <hr>`;
+        <hr class="section-divider">`;
     body.appendChild(row);
     reindexMDS();
 }

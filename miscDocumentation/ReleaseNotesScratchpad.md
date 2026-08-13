@@ -19,6 +19,8 @@ This mode runs a filter sweep during a smear exposure. You can use these with ot
 
 Other, more abstract use-cases are of course possible. But that's the most practical one I can think of right now. 
 
+### #231 - Add horizontal line to delineate the different keyframes in MDS mode. #231
+
 ## Changed:
 
 ## Fixed:
