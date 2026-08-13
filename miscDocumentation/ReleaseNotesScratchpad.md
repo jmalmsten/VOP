@@ -26,3 +26,5 @@ Other, more abstract use-cases are of course possible. But that's the most pract
 ## Fixed:
 ### The ONLINE indicator didn't work
 fixed.
+
+### corrected pull_and_run... scripts. 
