@@ -145,6 +145,11 @@
                         <button class="mini-btn" onclick="document.getElementById('cam_mag_file_input').click()" title="Load a video reel into the Cam Mag. ProRes 4444 in linear gamma recommended for highest fidelity.">UPLOAD</button>
                         <button class="mini-btn danger" onclick="nukeMag()" title="Deletes everything in the Cam Mag (loaded reels or exposed latents)">NUKE</button>
                     </div>
+                    <div class="input-row spaced">
+	                    <div class="c-box">
+                            <button class="action-btn" onclick="triggerLabInvert()" title="Invert the latent image buffer for holdout mattes">LAB / INVERT</button>
+                        </div>                        
+                    </div>
                 </div>
 
                 <div class="group-box">

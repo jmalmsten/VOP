@@ -23,6 +23,9 @@ Other, more abstract use-cases are of course possible. But that's the most pract
 
 ## Changed:
 
+### #233 - Move LAB / INVERT button to CAM MAG section
+It just fits better there considering what it does. 
+
 ## Fixed:
 ### The ONLINE indicator didn't work
 fixed.
@@ -30,5 +33,6 @@ fixed.
 ### corrected pull_and_run... scripts. 
 These were giving me headaches when it came to running them as they started to worry about files they should be overwriting.
 
-### #233 - BUG: FIT FOV and FILL FOV for Bipack 1 and Bipack 2 both target world scale on Projection Mag
+### #234 - BUG: FIT FOV and FILL FOV for Bipack 1 and Bipack 2 both target world scale on Projection Mag
+
 
