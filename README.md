@@ -1,21 +1,10 @@
-> ⚠️ **DISCLAIMER - The GitHub repo is a read only mirror of [VOP on Codeberg](https://codeberg.org/jmalmsten-com/VOP).**
----
-
->
 > **REGARDING LLM USE**
 > 
-> In light of the recent Codeberg TOS addition [regarding use of LLM's on Codeberg repos](https://blog.codeberg.org/protecting-our-floss-commons-from-llms.html), this repo will be somewhat paused as I will have to change my workflow for how I continue this whole project. I do not want to fight Codeberg on this, and I am not going to. Because I cannot with good conscious win it, even if I could. Which I do not think I can anyway.
->
-> If a moderator of Codeberg sees this. I am looking at the repo myself. Actively distancing it from LLM use. I like Codeberg. I want to continue being here. So I'll do what is required to do so. 
+> This project has a strict NO LLM use policy for further development. Most of the code here in this repo is written with the help of LLM's. But my goal for this whole project from the start is to learn to code with Python. And I cannot do more coding relying on LLM's that heavily. This means I will not accept vibecoded contributions (if I wanted to vibecode, I'd do it myself). And progress in general for the project will be basically a stand-still while I am getting myself out of the LLM dependency. I am also moving the whole repo from Codeberg to Codeberg to here at GitHub. as it is right now in violation of their terms of service.  
 ---
 
-
-> 
-> **All development, issues, pull requests, discussions, releases, and wiki** happen on Codeberg.
-> GitHub features are actively **disabled or ignored**.
-
 > [!IMPORTANT]
-> This project is a learning experiment. I cannot provide support outside of what has worked for me. Run this code only if you accept the risks of experimental software. And while this Flask Web application **CAN** be exposed on the public internet. I **HIGHLY** recommend doing it through a VPN instead if you want to reach it from outside.
+> This project is a learning experiment. I cannot provide support outside of what has worked for me. Run this code only if you accept the risks of experimental software. 
 
 ![VOP Logo](static/VOP-Graphic.png)
 ---
