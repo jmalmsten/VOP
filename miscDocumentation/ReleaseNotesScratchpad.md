@@ -1,41 +1,13 @@
-# V0.16
-## Notes:
+# V26.1.0
+## Notes: 
+First release since the big move from Codeberg to GitHub. With it also came the big change of calendar versioning. So we're now jumping straight from v0.16.x to the far flung future of v26.1.0. Just as a reminder. This just means that the first digits are the year, second is release number and third is a patch. Does having only two digits not mean that we're in trouble by the time it rolls over to year 2100? Yes. But that's a future relative's problem. And easily solved by then by just bumping the year value to four digits. 
+
 ## Added:
-### #15 - ADM Mode
-First iteration of the Animation Desk Mode that let's you use the VOP as a background for physical animations in front of the projection screen. Can be used for cel-animations, cutouts, puppets/claymation. A lot of things. And as with other things in the VOP. It's needlessly realistic. So there's no undos. Once a frame is committed to the Cam Mag. It's committed. 
-### Skip keyframe pairs that are 0 exposure time.
-This is simply to speed up working on composites that need multiple passes but not all passes need to run through the whole exposure sheet. The mechanism detects keyframe pairs that are set to 0 as exposure time. If a keyframe is 0 as exposure time but a keyframe on either side of it, before or after, is not 0, that's a fade and that shouldn't be skipped. 
-### Pi's status LED turn off during exposure
-To minimize the risk of stray light reflecting off the projection screen, the status LED on the Pi will now turn off during exposures. 
-### #230 - Sweep Mode
-This is a dropdown menu for each projection side image that makes it do brightness sweeps across the image. It defaults to ByPass to make sure it doesn't do anything weird unless you want it. Other modes are: 
-- **HighPass** - This makes all the brightness values above the threshold white and all below dark
-- **LowPass** - This does the opposite
-- **Bandpass** - This makes values above and below the threshold black and only the threshold value white.
-
-Along with these is the **Width** value. This widens the values at the threshold to show more or less pixels. 
-
-This mode runs a filter sweep during a smear exposure. You can use these with other projection layers to produce some wild pseudo-3D renderings. And even do almost depth compositing by rendering out from a 3D modeling program like Blender, 2 passes, Depth Map and a Beauty Pass. Depth to provide where the pixels are in 3D space and Beauty Pass to provide the colors of those pixels. And you'll use the depth map to tell which pixels should be in what depth using the Sweep mode. I imagine one can use this to make warp speed stretching like effects from the Star Trek TNG shows. 
-
-Other, more abstract use-cases are of course possible. But that's the most practical one I can think of right now. 
-
-### #231 - Add horizontal line to delineate the different keyframes in MDS mode. #231
-
+### Discussion forum
+One unexpected bonus of this move is that I and others now have access to the Discussions page of the repo. Here things can be discussed more informally without necessarily making issues for everything. There's apparently also a "Show and tell" category here. Seems fun. Will see what happens here.
 ## Changed:
-
-### #233 - Move LAB / INVERT button to CAM MAG section
-It just fits better there considering what it does. 
-
-### #235 - Move Noise crusher and Hot pixel mapper back to main
-As these are both settings that need to be fine tuned per job, it should be on the main page. 
-
+### Calendar Versioning.
+As I never had a real clue as to what constituted a v1. I just kept pushing it ahead of myself. I realized that for a tool like the VOP. I might as well just change it to Calendar Versioning so that it's clear when it was released and wether it's just a patch or a full release number. 
+### #240 - Rewrite of scripts to make sure they don't point to codeberg
+As the codebase and documentation on the original codeberg repo will becoming obsolete fast. I'm repointig everything to the github counterparts. Should be no change for end users. But I want it noted.
 ## Fixed:
-### The ONLINE indicator didn't work
-fixed.
-
-### corrected pull_and_run... scripts. 
-These were giving me headaches when it came to running them as they started to worry about files they should be overwriting.
-
-### #234 - BUG: FIT FOV and FILL FOV for Bipack 1 and Bipack 2 both target world scale on Projection Mag
-
-
