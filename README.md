@@ -1,6 +1,3 @@
-> [!IMPORTANT]
-> This project is a learning experiment. I cannot provide support outside of what has worked for me. Run this code only if you accept the risks of experimental software. 
-
 ![VOP Logo](static/VOP-Graphic.png)
 ---
 # VOP
