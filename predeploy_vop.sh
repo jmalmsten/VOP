@@ -691,7 +691,7 @@ else
 fi
 echo "  6. On the Pi:"
 echo "       sudo apt install git -y"
-echo "       git clone https://codeberg.org/jmalmsten-com/VOP.git"
+echo "       git clone https://github.com/jmalmsten/VOP.git
 echo "       cd VOP"
 echo "       chmod +x deploy_vop.sh"
 echo "       ./deploy_vop.sh"

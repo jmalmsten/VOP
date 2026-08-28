@@ -39,7 +39,7 @@ Description:    Live MJPEG preview feed from the IMX477 for the
 #     <http://www.gnu.org/licenses/>.
 #
 #     Source code for this application can be found at
-#     https://codeberg.org/jmalmsten-com/VOP
+#     https://github.com/jmalmsten/VOP
 #
 ###########################################################################
 

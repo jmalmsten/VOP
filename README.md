@@ -1,6 +1,6 @@
 > **REGARDING LLM USE**
 > 
-> This project has a strict NO LLM use policy for further development. Most of the code here in this repo is written with the help of LLM's. But my goal for this whole project from the start is to learn to code with Python. And I cannot do more coding relying on LLM's that heavily. This means I will not accept vibecoded contributions (if I wanted to vibecode, I'd do it myself). And progress in general for the project will be basically a stand-still while I am getting myself out of the LLM dependency. I am also moving the whole repo from Codeberg to Codeberg to here at GitHub. as it is right now in violation of their terms of service.  
+> This project has a strict NO LLM use policy for further development. Most of the code here in this repo is written with the help of LLM's. But my goal for this whole project from the start is to learn to code with Python. And I cannot do more coding relying on LLM's that heavily. This means I will not accept vibecoded contributions (if I wanted to vibecode, I'd do it myself). And progress in general for the project will be basically a stand-still while I am getting myself out of the LLM dependency. I am also moving the whole repo from Codeberg to here at GitHub. as it is right now in violation of their terms of service.  
 ---
 
 > [!IMPORTANT]
@@ -19,7 +19,7 @@ Click the image below to play the playlist where I gather things regarding the V
 
 ### What does it aim to do?
 
-In essence. In its simplest form. It takes an input image. And "projects" it onto an HDMI screen in a virtual 3D plane. And during a long exposure, the camera sensor records the light coming off that HDMI screen to a frame that's saved in a folder called CamMag. This image is saved as a 16 bit linear color tiff. And if you do another exposure and target that same tiff. The VOP will merge the two using additive mix. This additive workflow is named [LIME (Latent Image Multiple Exposures)](https://codeberg.org/jmalmsten-com/VOP/wiki/LIME) and is designed to mimic real world film workflows where exposing the frame in the camera to light adds it to the existing latent image.
+In essence. In its simplest form. It takes an input image. And "projects" it onto an HDMI screen in a virtual 3D plane. And during a long exposure, the camera sensor records the light coming off that HDMI screen to a frame that's saved in a folder called CamMag. This image is saved as a 16 bit linear color tiff. And if you do another exposure and target that same tiff. The VOP will merge the two using additive mix. This additive workflow is named [LIME (Latent Image Multiple Exposures)](https://github.com/jmalmsten/VOP/wiki/LIME) and is designed to mimic real world film workflows where exposing the frame in the camera to light adds it to the existing latent image.
 
 This is all orchestrated with an exposure sheet to make a sequence of TIFFS or ProRes444. That sequence or .mov can then be moved to a desktop for further digital compositing and NLE work.
 
@@ -49,19 +49,19 @@ Mainly... me. I'm just putting this on a public repo in case someone out there w
 - **Raspberry Pi 5 or 4 (4GB+)** - The VOP is lightweight, typically using <1GB of RAM  
 - **Raspberry Pi Camera HQ** - (IMX477) with appropriate lens.
 - **Storage with Raspberry Pi OS Lite (64 bit)** - SD card or USB3.2 Solid State Flash Drive. The faster, the better for handling the big TIFF files.
-- **HDMI Monitor** - Preferably an OLED (although the [black crush system](https://codeberg.org/jmalmsten-com/VOP/wiki/NoiseCrush) introduced in v0.6.3 helps a lot here for cheaper screens). The VOP uses EDID handshake to get the screens resolution for projection output. So pretty much any HDMI screen that the host Pi can handle should work. I used it successfully on a standard 16:9 1920x1080 screen and I now use a 3:2 2160x1440 screen in my prototype. 
+- **HDMI Monitor** - Preferably an OLED (although the black crush system introduced in v0.6.3 helps a lot here for cheaper screens). The VOP uses EDID handshake to get the screens resolution for projection output. So pretty much any HDMI screen that the host Pi can handle should work. I used it successfully on a standard 16:9 1920x1080 screen and I now use a 3:2 2160x1440 screen in my prototype. 
 - **Device for control** - the VOP is controlled with a web interface, pretty much any modern web browser on a modern OS works as long as it's on the same network (though I would love to see it work on an Amiga 2000 if anyone has the knowhow). I recommend having the browser on a screen at at least 1920x1080.
 ## Regarding other cameras and film workflows
 The question has come up a few times if this system can use a film camera (like, Super8 and 16mm) and communicate with solutions for film based optical printers. And I have to say that it's not currently a feature. And as I myself don't have a working motion film camera and I don't have the economic means to experiment on that front, it's not a feature I can prioritize for implementation. You are however, welcome to fork this project and even suggest code to make it work. 
 ## Installation and use
 Check the Wiki for current instructions that should work. At least, it has worked for me. 
-- [wiki/tutorials](https://codeberg.org/jmalmsten-com/VOP/wiki/Tutorials_main)
+- [wiki/tutorials](https://github.com/jmalmsten/VOP/wiki/Tutorials_main)
 
 # Contributing
-Please report bugs or suggest improvements via **[ISSUES](https://codeberg.org/jmalmsten-com/VOP/issues)**. As this is a personal project, I will filter out what doesn't fit the intended workflow of the VOP, but I welcome suggestions, bug reports and solutions I have yet to think of!
+Please report bugs or suggest improvements via **[ISSUES](https://github.com/jmalmsten/VOP/issues)**. And there's also the **[DISCUSSIONS](https://github.com/jmalmsten/VOP/discussions)** page here where you can show off things you do or ask for help. As this is a personal project, I will filter out what doesn't fit the intended workflow of the VOP, but I welcome suggestions, bug reports and solutions I have yet to think of!
 
-Also see Wiki for more about [contributions](https://codeberg.org/jmalmsten-com/VOP/wiki/Contributing).
+Also see Wiki for more about [contributions](https://github.com/jmalmsten/VOP/wiki/Contributing).
 
-**License:** This project is open-source under the [AGPL-3.0 License](LICENSE).
+**License:** This project is open-source under the [AGPL-3.0 License](https://github.com/jmalmsten/VOP/blob/main/LICENSE).
 
 Copyright (c) 2025-2026 jmalmsten
