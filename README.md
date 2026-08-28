@@ -1,8 +1,3 @@
-> **REGARDING LLM USE**
-> 
-> This project has a strict NO LLM use policy for further development. Most of the code here in this repo is written with the help of LLM's. But my goal for this whole project from the start is to learn to code with Python. And I cannot do more coding relying on LLM's that heavily. This means I will not accept vibecoded contributions (if I wanted to vibecode, I'd do it myself). And progress in general for the project will be basically a stand-still while I am getting myself out of the LLM dependency.  
----
-
 > [!IMPORTANT]
 > This project is a learning experiment. I cannot provide support outside of what has worked for me. Run this code only if you accept the risks of experimental software. 
 
