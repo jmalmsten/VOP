@@ -240,6 +240,18 @@ No JS event handlers here - those are wired up by slice 7 in main.js.
                 <input type="number" id="cal_wb_expo_high" step="0.01" value="0.70"
                        title="Upper bound for the brightest channel. keeps every channel clear of clipping.">
             </div>
+
+            <hr class="section-divider">
+            <!--
+                Defect Mapping: MAP PIXELS builds a hot-pixel map from a dark frame;
+                                NUKE MAP clears it.
+            -->
+            <div class="const-group crush-group">
+                <label>Defect Mapping</label>
+                <button class="mini-btn" onclick="triggerHotPixelMap()">MAP PIXELS</button>
+                <button class="mini-btn danger" onclick="nukeHotPixels()">NUKE MAP</button>
+                <span id="hp_result_txt"></span>
+            </div>
         </div>
 
         <div class="input-row spaced cal-wb-trigger-row">
