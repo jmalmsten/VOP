@@ -174,7 +174,8 @@ echo "  SSH public key. Lets this machine log into the Pi with key auth (no"
 echo "  password) on first boot. Only the PUBLIC key is copied to the Pi."
 if [ -n "$KEY_DEFAULT" ]; then
     echo "  Found: $KEY_DEFAULT"
-    read -r -p "  Enter to use it, type another path, or type 'skip': " KEY_INPUT
+    # Change -r to -e to enable Readline (tab completion)
+    read -e -p "  Enter to use it, type another path, or type 'skip': " KEY_INPUT
     if [ -z "$KEY_INPUT" ]; then
         SSH_PUBKEY="$KEY_DEFAULT"
     elif [ "$KEY_INPUT" = "skip" ]; then
@@ -184,8 +185,19 @@ if [ -n "$KEY_DEFAULT" ]; then
     fi
 else
     echo "  No standard key found in ~/.ssh."
-    read -r -p "  Type a path to a public key, or press Enter to skip: " KEY_INPUT
-    SSH_PUBKEY="$KEY_INPUT"          # empty stays empty = skip
+    # Change -r to -e here as well
+    read -e -p "  Type a path to a public key, or press Enter to skip: " KEY_INPUT
+    SSH_PUBKEY="$KEY_INPUT"
+fi
+
+# Add these lines BEFORE the validation check to sanitize user input
+if [ -n "$SSH_PUBKEY" ]; then
+    # Strip leading and trailing whitespace (protects against paste errors)
+    SSH_PUBKEY="${SSH_PUBKEY#"${SSH_PUBKEY%%[![:space:]]*}"}"
+    SSH_PUBKEY="${SSH_PUBKEY%"${SSH_PUBKEY##*[![:space:]]}"}"
+    
+    # Expand leading tilde (~) to the user's actual home directory
+    SSH_PUBKEY="${SSH_PUBKEY/#\~/$HOME}"
 fi
 
 # Validate a chosen key actually exists, before we destroy anything.
@@ -691,7 +703,7 @@ else
 fi
 echo "  6. On the Pi:"
 echo "       sudo apt install git -y"
-echo "       git clone https://github.com/jmalmsten/VOP.git
+echo "       git clone https://github.com/jmalmsten/VOP.git"
 echo "       cd VOP"
 echo "       chmod +x deploy_vop.sh"
 echo "       ./deploy_vop.sh"
