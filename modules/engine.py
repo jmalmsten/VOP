@@ -859,7 +859,6 @@ def run_persistent_engine():
                         tex_mgr.white_tex.use(0)
                         vao.render(moderngl.TRIANGLE_STRIP)
 
-                    tex_mgr.release() # Free system RAM and VRAM per frame
                     ctx.finish()  
                     pygame.display.flip()
                 
