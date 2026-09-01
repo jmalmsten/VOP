@@ -16,10 +16,16 @@ As I never had a real clue as to what constituted a v1. I just kept pushing it a
 ### #240 - Rewrite of scripts to make sure they don't point to codeberg
 As the codebase and documentation on the original codeberg repo will becoming obsolete fast. I'm repointig everything to the github counterparts. Should be no change for end users. But I want it noted.
 
+### Dead Pixel mapping moved back to calibration page
+Since it's not a procedure that will be thought of for every pass, it lives better in the calibration page and it also fixes an issue where the output of the noise crusher measurement gets covered by the dead pixel mapper buttons.
+
 ## Fixed:
 
 ### Predeploy didn't accept pub-key path
 Fixed this so predeploy goes smoother.
 
-### Dead Pixel mapping moved back to calibration page
-Since it's not a procedure that will be thought of for every pass, it lives better in the calibration page and it also fixes an issue where the output of the noise crusher measurement gets covered by the dead pixel mapper buttons.
+### Noise floor measure result covered by dead pixel mapping button
+Fixed by moving the button as mentioned above
+
+### #246 - Memory leak when video is used as projection source
+Fixed by adding a tex_mgr.release() at the end of the frame loop so the RAM and VRAM flushes for each frame as well as the old per job. 

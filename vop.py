@@ -85,7 +85,7 @@ CAL_TARGETS_FILE = "/tmp/vop_cal_targets"
 # ever deletes it, via /adm_clear.
 ADM_HOLD_FILE = "/tmp/vop_adm_hold"
 
-VOP_VERSION ="0.16.0" # <-- This line probably should be removed at some point as I won't remember to update it manually.
+VOP_VERSION ="26.1" # <-- This line probably should be removed at some point as I won't remember to update it manually.
 
 # Initialize required directory structure on boot if missing
 PRORES_DIR = os.path.join(BASE_DIR, "ProRes")
