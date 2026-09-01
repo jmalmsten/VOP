@@ -2,9 +2,6 @@
 VOP Module:     graphics_utils.py
 Description:    GL Pipeline management.
                 Enforces #version 300 es and overrides ModernGL's default 330 requirement.
-                Added vertical flip to OpenCV image loading to match OpenGL texture coords.
-                TextureManager now keys per-layer file lists by layer name (pm/bp1/bp2)
-                to support three independent optical layers.
 """
 #
 ###########################################################################
@@ -36,6 +33,7 @@ import moderngl
 import numpy as np
 import os
 import cv2
+import collections # Required for OrderedDict access tracking
 
 def init_render_pipeline():
     vert = """
@@ -373,14 +371,25 @@ class TextureManager:
         'bp2': 'ProjBiPack2',
     }
 
-    def __init__(self, ctx, proj_dir, job_data):
+    def __init__(self, ctx, proj_dir, job_data, max_capacity=15):
         """
         proj_dir is the ProjMag directory. We derive sibling folders for BP1 
         and BP2 from its parent (BASE_DIR). Caller doesn't need to know 
         anything about bipack folders - the layer layout is encoded here.
+        max_capacity=15 means it holds 15 projection images in cache spread
+        out over the three layers (PM, BP1 and BP2)
         """
         self.ctx = ctx
-        self.cache = {}
+
+        # Use OrderedDict to track cache access history.
+        # Items inserted or accessed are moved to the right (most recent)
+        # Items on the left (index0) are the oldest (least recently used)
+        self.cache = collections.OrderedDict()
+
+        # Set the strict upper limit for how many textures can reside in VRAM.
+        # A capacity of 15 comfortably covers PM, BP1 and BP2 simultaneaously
+        # across multiple held frames without triggering premature eviction.
+        self.max_capacity = max_capacity
 
         # 1x1 pure-white texture used as a pass-through stand-in whenever a 
         # layer is hidden (eye-toggle off) or has no source frames on disk. 
@@ -445,8 +454,26 @@ class TextureManager:
         idx = max(0, min(len(files)-1, int(playhead)))
         f_path = files[idx]
         
+        # CACHE HIT
         if f_path in self.cache: 
+            # Mark this specific texture as the most recently used.
+            # move_to_end shifts the key-value pair to the far right of the OrderedDict.
+            self.cache.move_to_end(f_path)
             return self.cache[f_path]
+        # CACHE MISS - EVICTION CHECK
+        # Before reading from disk, ensure there is room in the cache
+        # If the current item count meets or exceeds the set capacity limit,
+        # we must free VRAM before allocating a new texture
+        while len(self.cache) >= self.max_capacity:
+            # popitem(last=False) removes and returns the  first item (leftmost).
+            # Due to move_to_end() above, the leftmost item is guaranteed to be
+            # the last recently used file path.
+            oldest_path, (oldest_tex, oldest_asp) = self.cache.popitem(last=False)
+
+            # Execute the ModernGL release method to destroy the texture obect
+            # and explicitly free its associated VRAM block.
+            oldest_tex.release()
+
         
         # cv2.IMREAD_UNCHANGED preserves both the alpha channel (for PNGs) 
         # AND the source bit depth (8 vs 16). Without this flag, OpenCV 
@@ -513,11 +540,12 @@ class TextureManager:
             img_f16  = img_norm.astype(np.float16)        # float32 -> float16, same range
             tex = self.ctx.texture((w, h), 3, img_f16.tobytes(), dtype='f2')
         else:
-            # 8-bit RGB upload. Matches the pre-phase-2 behavior exactly so 
-            # SSS / MDS jobs with 8-bit sources continue producing 
-            # bit-identical output.
+            # 8-bit RGB upload. SSS / MDS jobs with 8-bit sources continue
+            # producing bit-identical output.
             tex = self.ctx.texture((w, h), 3, img.tobytes())
         
+        # Insert the newly created texture into the cache
+        # New insertions are automatically placed at the rightmost end (most recently used)
         self.cache[f_path] = (tex, w/h)
         return tex, w/h
 
@@ -527,6 +555,7 @@ class TextureManager:
         run_persistent_engine at end-of-task to release VRAM before 
         the next job's texture manager is created.
         """
+        # ITerates through ay remaining textures in the cache and destroys them
         for t, a in self.cache.values(): 
             t.release()
         self.white_tex.release()

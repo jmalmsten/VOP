@@ -28,4 +28,4 @@ Fixed this so predeploy goes smoother.
 Fixed by moving the button as mentioned above
 
 ### #246 - Memory leak when video is used as projection source
-Fixed by adding a tex_mgr.release() at the end of the frame loop so the RAM and VRAM flushes for each frame as well as the old per job. 
+Implemented a Last Recently Used (LRU cache) to only keep the last 15 images in projection cache to avoid runaway memory leaks on jobs with video as source.
