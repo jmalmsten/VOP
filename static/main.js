@@ -94,12 +94,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // FULL SCREEN TOGGLE
 // Checks if a full-screen element already exists. If not, it requests it; if one does exist, it exits.
-function toggleFulllscreen(element){
+function toggleFullscreen(element) {
     if (!element) return;
-
+    
     if (!document.fullscreenElement) {
         element.requestFullscreen().catch(err => {
-            console.erroro(`Error attempting to enable fullscreen: ${err.message}`);
+            console.error(`Error attempting to enable fullscreen: ${err.message}`);
         });
     } else {
         document.exitFullscreen();
