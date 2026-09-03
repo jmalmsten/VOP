@@ -1481,6 +1481,16 @@ body.adm-mode .adm-step-row    { display: flex; }
     border-bottom:      1px solid var(--border-color);
 }
 
+.sheet-header .brk-sheet-settings {
+    margin-left:        20px;
+}
+
+.sheet-header .mode-control {
+    margin-left:        auto;
+    margin-right:       auto; /* Centers the dropdown perfectly in the header */
+}
+
+
 .sheet-title {
     margin:             0;
     color:              var(--text-secondary);
