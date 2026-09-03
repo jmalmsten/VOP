@@ -525,7 +525,7 @@ body.adm-mode .adm-step-row    { display: flex; }
      * .preview-area sets max-width but never width, so this slots in clean
      * regardless of source order. */
     width:              100%;
-    max-width:          100%;
+    max-width:          none;
     height:             100%;
 }
 
