@@ -39,7 +39,7 @@
         
         <div class="vop-header">
             <!-- Page title -->
-            <h2>VOP v26.2.3</h2>
+            <h2>VOP v26.2.4</h2>
 
             <!-- Page navigation. Click to switch between Main
                  (job editor + status + xsheet) and Calibration
@@ -536,7 +536,6 @@
             </div>
 
             <div class="sheets-area">
-                <button type="button" class="mini-btn fullscreen-btn" onclick="toggleFullscreen(this.closest('.sheets-area'))" title="Toggle Full Screen">&#9974;</button> <!-- when using on other elements. Make sure to update toggleFull() to point to the correct DIV -->
                 <div class="sheet-header">
                     <h3 class="sheet-title">Exposure Sheet</h3>
                     <!-- BRK MODE PER-JOB CONSTANTS
@@ -603,6 +602,7 @@
                             </optgroup>
                         </select>
                     </div>
+                    <button type="button" class="mini-btn fullscreen-btn" onclick="toggleFullscreen(this.closest('.sheets-area'))" title="Toggle Full Screen">&#9974;</button> <!-- when using on other elements. Make sure to update toggleFull() to point to the correct DIV -->
                 </div>
 
                 <div class="sheet-container" id="mds_wrapper">
