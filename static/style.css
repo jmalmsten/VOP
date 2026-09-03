@@ -328,11 +328,6 @@ body {
     opacity: 1.0;
 }
 
-/* Ensure the preview area can contain the absolute positioned button */
-preview-area{
-    position: relative;
-}
-
 /* When a page section is active, it becomes a grid container with
  * the same column layout .container used to provide directly. This
  * is necessary because the Main page's children (.preview-area,
@@ -1060,6 +1055,8 @@ body.adm-mode .adm-step-row    { display: flex; }
 }
 
 .preview-area {
+    /* Ensure the preview area can contain the absolute positioned button */position:                 relative;
+
     /* Unified with the group boxes (was var(--bg-panel)). */
     background:               var(--bg-group-glass);
     -webkit-backdrop-filter:  blur(var(--group-blur));
@@ -1592,6 +1589,7 @@ body.adm-mode .adm-step-row    { display: flex; }
 .sheets-area {
     grid-column:        1;
     align-self:         start;
+    position:           relative;
     
     /* Allow the sheet to extend rightward beyond the controls grid column
      * when video-mode rows need more horizontal room. Width = viewport, 
