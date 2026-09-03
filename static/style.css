@@ -312,6 +312,38 @@ body {
     display: none;
 }
 
+/* Fullscreen button for making DIVs full screen. Will be very handy
+ * on multi-screen devices
+ */
+
+.fullscreen-btn {
+    position:absolute;
+    top:     10px;
+    right:   10px;
+    z-index: 10;
+    opacity:  0.7;
+}
+
+.fullscreen-btn:hover {
+    opacity: 1.0;
+}
+
+.preview-area .fullscreen-btn{
+    position:   absolute;
+    top:        10px;
+    right:      10px;
+    z-index:    10;
+    opacity:    0.7;
+}
+
+.sheet-header .fullscreen-btn {
+    position:       static;
+    margin-left:    auto; /* Push it to the far right of the header 
+                             flex row */
+    top:            auto;
+    right:          auto;
+}
+
 /* When a page section is active, it becomes a grid container with
  * the same column layout .container used to provide directly. This
  * is necessary because the Main page's children (.preview-area,
@@ -473,8 +505,8 @@ body.adm-mode .adm-step-row    { display: flex; }
  * column. Same column as Main's preview, same visual treatment. */
 .cal-preview-area {
     grid-column:        1;
-    justify-self:       center;
-    align-self:         start;
+    justify-self:       stretch; /* Fill the column width */
+    align-self:         stretch; /* Stretch to match the height of the control stack */
 
     /* Width fix - issue #202. The Main preview's flex item is a bare <img>
      * whose intrinsic width drives .preview-area's width:auto. Here the flex
@@ -492,7 +524,9 @@ body.adm-mode .adm-step-row    { display: flex; }
      * #probe_img does on Main. No conflict with the inherited rule:
      * .preview-area sets max-width but never width, so this slots in clean
      * regardless of source order. */
-    width:              70vh;
+    width:              100%;
+    max-width:          none;
+    height:             100%;
 }
 
 /* Right-column control stack. Sits in column 2 of the page grid,
@@ -1039,6 +1073,8 @@ body.adm-mode .adm-step-row    { display: flex; }
 }
 
 .preview-area {
+    /* Ensure the preview area can contain the absolute positioned button */position:                 relative;
+
     /* Unified with the group boxes (was var(--bg-panel)). */
     background:               var(--bg-group-glass);
     -webkit-backdrop-filter:  blur(var(--group-blur));
@@ -1073,7 +1109,7 @@ body.adm-mode .adm-step-row    { display: flex; }
     min-width:          300px;
     max-width:          70vh;
     min-height:         320px;
-    height:             var(--preview-h);
+    height:             100%;   /* Fill the stretched row height */
 
     display:            flex;
     align-items:        center;
@@ -1114,7 +1150,7 @@ body.adm-mode .adm-step-row    { display: flex; }
      * pin them to the TOP of the row. The row itself still stretches to the
      * tall grid track, but that just leaves empty board below the scope -
      * same as the preview always did. */
-    align-items:     flex-start;
+    align-items:     stretch; /* Stretch both children to fill the full row height */
     gap:             14px;
 }
 
@@ -1127,9 +1163,9 @@ body.adm-mode .adm-step-row    { display: flex; }
  *     full-height column: add an explicit `height` here (e.g. 22vh) and
  *     change .preview-row's align-items to flex-start. <<< */
 .waveform-area {
-    flex:                     0 0 16vh;            /* width (vh-relative, tracks the preview) */
-    height:                   var(--preview-h);    /* << the fix: match the preview exactly */
-    box-sizing:               border-box;          /* issue #185: keep padding+border INSIDE
+    flex:                     0 0 50vh;            /* Square width (matches the 50vh height) */
+    height:                   100%;                /* Fill the stretched row height */
+    box-sizing:               border-box;          /* Keep padding+border INSIDE
                                                      * the 50vh, so this panel's bottom edge
                                                      * lands level with .preview-area instead
                                                      * of spilling ~12px below it. */
@@ -1447,6 +1483,16 @@ body.adm-mode .adm-step-row    { display: flex; }
     border-bottom:      1px solid var(--border-color);
 }
 
+.sheet-header .brk-sheet-settings {
+    margin-left:        20px;
+}
+
+.sheet-header .mode-control {
+    margin-left:        auto;
+    margin-right:       auto; /* Centers the dropdown perfectly in the header */
+}
+
+
 .sheet-title {
     margin:             0;
     color:              var(--text-secondary);
@@ -1569,8 +1615,9 @@ body.adm-mode .adm-step-row    { display: flex; }
 }
 
 .sheets-area {
-    grid-column:        1;
+    grid-column:        1 / -1;     /* Span both columns across the full width */
     align-self:         start;
+    position:           relative;
     
     /* Allow the sheet to extend rightward beyond the controls grid column
      * when video-mode rows need more horizontal room. Width = viewport, 
@@ -1578,8 +1625,8 @@ body.adm-mode .adm-step-row    { display: flex; }
      * column, minus the 20px container gap. The sheet now starts at its 
      * natural grid position on the left and ends just before the controls 
      * column on the right. */
-    width:              max(830px, calc(100vw - 480px - var(--wood-frame-total)));
-    max-width:          max(830px, calc(100vw - 480px - var(--wood-frame-total)));
+    width:              100%; /* <-- Fill the full grid span */
+    max-width:          100%; /* <-- Remove the artificial column-1 restriction*/
     box-sizing:         border-box;
 }
 

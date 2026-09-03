@@ -52,6 +52,7 @@ No JS event handlers here - those are wired up by slice 7 in main.js.
      The .feed-active class on the stack flips which one shows; CSS
      handles the visibility so the HTML stays logic-free. -->
 <div class="preview-area cal-preview-area">
+    <button type="button" class="mini-btn fullscreen-btn" onclick="toggleFullscreen(this.closest('.cal-preview-area'))" title="Toggle Full Screen">&#9974;</button>
     <div class="cal-preview-stack" id="cal_preview_stack">
         <img id="cal_probe_img" alt="Calibration Capture Preview">
         <img id="cal_feed_img" alt="Live Framing Feed">

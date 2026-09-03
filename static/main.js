@@ -91,6 +91,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+
+// FULL SCREEN TOGGLE
+// Checks if a full-screen element already exists. If not, it requests it; if one does exist, it exits.
+function toggleFullscreen(element) {
+    if (!element) return;
+    
+    if (!document.fullscreenElement) {
+        element.requestFullscreen().catch(err => {
+            console.error(`Error attempting to enable fullscreen: ${err.message}`);
+        });
+    } else {
+        document.exitFullscreen();
+    }
+}
+
 function toggleSheetVisibility() {
     const mdsWrap = document.getElementById('mds_wrapper');
     const sssWrap = document.getElementById('sss_wrapper');
