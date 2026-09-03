@@ -1107,7 +1107,7 @@ body.adm-mode .adm-step-row    { display: flex; }
     min-width:          300px;
     max-width:          70vh;
     min-height:         320px;
-    height:             var(--preview-h);
+    height:             100%;   /* Fill the stretched row height */
 
     display:            flex;
     align-items:        center;
@@ -1148,7 +1148,7 @@ body.adm-mode .adm-step-row    { display: flex; }
      * pin them to the TOP of the row. The row itself still stretches to the
      * tall grid track, but that just leaves empty board below the scope -
      * same as the preview always did. */
-    align-items:     flex-start;
+    align-items:     stretch; /* Stretch both children to fill the full row height */
     gap:             14px;
 }
 
@@ -1161,9 +1161,9 @@ body.adm-mode .adm-step-row    { display: flex; }
  *     full-height column: add an explicit `height` here (e.g. 22vh) and
  *     change .preview-row's align-items to flex-start. <<< */
 .waveform-area {
-    flex:                     0 0 16vh;            /* width (vh-relative, tracks the preview) */
-    height:                   var(--preview-h);    /* << the fix: match the preview exactly */
-    box-sizing:               border-box;          /* issue #185: keep padding+border INSIDE
+    flex:                     0 0 50vh;            /* Square width (matches the 50vh height) */
+    height:                   100%;                /* Fill the stretched row height */
+    box-sizing:               border-box;          /* Keep padding+border INSIDE
                                                      * the 50vh, so this panel's bottom edge
                                                      * lands level with .preview-area instead
                                                      * of spilling ~12px below it. */
