@@ -603,7 +603,6 @@
                         </select>
                     </div>
                 </div>
-                <button type="button" class="mini-btn fullscreen-btn" onclick="toggleFullscreen(this.closest('.sheets-area'))" title="Toggle Full Screen">&#9974;</button> <!-- when using on other elements. Make sure to update toggleFull() to point to the correct DIV -->
 
                 <div class="sheet-container" id="mds_wrapper">
                     {% include 'sections/mds-xsheet.html' %}
@@ -618,6 +617,7 @@
                 <div class="sheet-container" id="dre_wrapper" style="display: none;">
                     {% include 'sections/dre-xsheet.html' %}
                 </div>
+                <button type="button" class="mini-btn fullscreen-btn" onclick="toggleFullscreen(this.closest('.sheets-area'))" title="Toggle Full Screen">&#9974;</button> <!-- when using on other elements. Make sure to update toggleFull() to point to the correct DIV -->
             </div>
         </div>
         <!-- End #page_main -->
