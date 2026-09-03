@@ -328,6 +328,12 @@ body {
     opacity: 1.0;
 }
 
+.fullscreen-btn .sheet-header {
+    position:       static;
+    margin-left:    auto; /* Push it to the far right of the header 
+                             flex row */
+}
+
 /* When a page section is active, it becomes a grid container with
  * the same column layout .container used to provide directly. This
  * is necessary because the Main page's children (.preview-area,
@@ -1587,7 +1593,7 @@ body.adm-mode .adm-step-row    { display: flex; }
 }
 
 .sheets-area {
-    grid-column:        1;
+    grid-column:        1 / -1;     /* Span both columns across the full width */
     align-self:         start;
     position:           relative;
     
@@ -1597,8 +1603,8 @@ body.adm-mode .adm-step-row    { display: flex; }
      * column, minus the 20px container gap. The sheet now starts at its 
      * natural grid position on the left and ends just before the controls 
      * column on the right. */
-    width:              max(830px, calc(100vw - 480px - var(--wood-frame-total)));
-    max-width:          max(830px, calc(100vw - 480px - var(--wood-frame-total)));
+    width:              100%; /* <-- Fill the full grid span */
+    max-width:          100%; /* <-- Remove the artificial column-1 restriction*/
     box-sizing:         border-box;
 }
 
