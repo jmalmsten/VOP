@@ -312,6 +312,27 @@ body {
     display: none;
 }
 
+/* Fullscreen button for making DIVs full screen. Will be very handy
+ * on multi-screen devices
+ */
+
+.fullscreen-btn {
+    position:absolute;
+    top:     10px;
+    right:   10px;
+    z-index: 10;
+    opacity:  0.7;
+}
+
+.fullscreen-btn:hover {
+    opacity: 1.0;
+}
+
+/* Ensure the preview area can contain the absolute positioned button */
+preview-area{
+    position: relative;
+}
+
 /* When a page section is active, it becomes a grid container with
  * the same column layout .container used to provide directly. This
  * is necessary because the Main page's children (.preview-area,
