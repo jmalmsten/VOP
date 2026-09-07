@@ -1,4 +1,4 @@
-# v26.1.1
+# v26.1.2
 
 ## Notes: 
 The second release since the big move to GitHub.
@@ -16,3 +16,6 @@ rearranged a few of the sections to better use the screen real estate.
 
 
 ## Fixed:
+
+### Narrow browser window hides preview area. 
+When doing the layout changes above. It looks fine on 16:9 1080p screens. But when narrower screens are used. The previw area gets cut off and eventually hidden completely off-screen. 
