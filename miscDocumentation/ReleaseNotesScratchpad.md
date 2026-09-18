@@ -1,4 +1,4 @@
-# v26.1.2
+# v26.1.3
 
 ## Notes: 
 The second release since the big move to GitHub.
@@ -25,3 +25,6 @@ rearranged a few of the sections to better use the screen real estate.
 
 ### Narrow browser window hides preview area. 
 When doing the layout changes above. It looks fine on 16:9 1080p screens. But when narrower screens are used. The previw area gets cut off and eventually hidden completely off-screen. 
+
+### Silencing redundant logs
+When adding the screen timeout I found that the journalctl is spammed with redundant lines where ddcutil tries to find a desktop and there of course is none. So I silenced those logs with a -q flags so they don't clutter up the logs. 

@@ -121,7 +121,7 @@ def wake_system():
     is_asleep = False
 
     # Fire DDC/CI wake command to restore hardware display power
-    subprocess.run(["ddcutil", "setvcp", "d6", "01"], stdout= subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["ddcutil", "-q", "setvcp", "d6", "01"], stdout= subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     # Resume the persistent engine daemon
     if engine_process and engine_process.poll() is None:
@@ -140,7 +140,7 @@ def sleep_system():
     is_asleep= True
 
     # Bypass the DRM graphics pipeline and force the monitor into hardware standby
-    subprocess.run(["ddcutil", "setvcp", "d6", "04"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["ddcutil", "-q", "setvcp", "d6", "04"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     # Freeze the engine process to save CPU/GPU cycles
     if engine_process and engine_process.poll() is None:
