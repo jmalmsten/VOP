@@ -695,7 +695,7 @@ def track_activity():
         if is_asleep:
             wake_system()
 
-@app.route('ping', methods=['POST'])
+@app.route('/ping', methods=['POST'])
 def ping():
     # A lightweidght endpoint for the webGUI to reset the activity timer
     return jsonify({"status": "ok"})
