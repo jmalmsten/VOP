@@ -39,6 +39,8 @@ import glob
 import math
 import socket
 import time
+import threading
+import signal
 import numpy as np  # for 16-bit → 8-bit reduction in /cam_probe
 from flask import Flask, jsonify, request, render_template, send_from_directory, send_file, Response
 
@@ -101,6 +103,56 @@ prores_process = None
 # prores_process above. /workprint_status polls this to report the
 # in-flight ffmpeg mux back to the button.
 workprint_process = None
+
+# --- POWER MANAGEMENT GLOBALS ---
+ACTIVITY_TIMEOUT = 1 * 60 #(one minute for testing. Probably should increase to like, 15 minutes for real world use)
+last_activity_ts = time.time()
+is_asleep = False
+
+def wake_system():
+    """Restores display power and resumes the engine process"""
+    global is_asleep, engine_process, last_activity_ts
+
+    last_activity_ts = time.time()
+    if not is_asleep:
+        return
+    
+    print("[VOP SERVER] Waking system from idle...")
+    is_asleep = False
+
+    # Fire DDC/CI wake command to restore hardware display power
+    subprocess.run(["ddcutil", "setvcp", "d6", "01"], stdout= subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    # Resume the persistent engine daemon
+    if engine_process and engine_process.poll() is None:
+        engine_process.send_signal(signal.SIGCONT)
+
+def sleep_system():
+    """Powers down the display and suspends the engine idle loop."""
+    global is_asleep, engine_process
+
+    # Guard: Do not sleep if a job or render is currently executing
+    if os.path.exists(COMMAND_FILE): return
+    if prores_process and prores_process.poll() is None: return
+    if workprint_process and workprint_process.poll() is None: return
+
+    print("[VOP SERVER] System inactive for 1 minute. Suspending.")
+    is_asleep= True
+
+    # Bypass the DRM graphics pipeline and force the monitor into hardware standby
+    subprocess.run(["ddcutil", "setvcp", "d6", "04"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    # Freeze the engine process to save CPU/GPU cycles
+    if engine_process and engine_process.poll() is None:
+        engine_process.send_signal(signal.SIGSTOP)
+
+def watchdog_loop():
+    """Background thread that polls for inactivity"""
+    global last_activity_ts
+    while True:
+        time.sleep(10)
+        if not is_asleep and (time.time() - last_activity_ts > ACTIVITY_TIMEOUT):
+            sleep_system()
 
 def ensure_engine_running():
     """
@@ -631,6 +683,22 @@ def dispatch_engine(task, payload):
             time.sleep(0.1)
 
 # --- FLASK ROUTES ---
+
+@app.before_request
+def track_activity():
+    global last_activity_ts
+    # Ignore background polling routes; we only care about real user actions
+    polling_routes = ['status', 'prores_status', 'workprint_status', 'check_validation_warning', 'calibration_state', 'calibration_feed']
+
+    if request.endpoint and request.endpoint not in polling_routes:
+        last_activity_ts = time.time()
+        if is_asleep:
+            wake_system()
+
+@app.route('/ping', methods=['POST'])
+def ping():
+    # A lightweidght endpoint for the webGUI to reset the activity timer
+    return jsonify({"status": "ok"})
 
 @app.route('/')
 def index(): 
@@ -1959,5 +2027,9 @@ if __name__ == '__main__':
 
     # Boot the persistent engine daemon before opening the web socket
     ensure_engine_running()
+
+    # Start the power management watchdog
+    watchdog_thread = threading.Thread(target=watchdog_loop, daemon=True)
+    watchdog_thread.start()
 
     app.run(host='0.0.0.0', port=port, debug=False)
