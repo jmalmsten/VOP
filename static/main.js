@@ -2997,3 +2997,27 @@ async function admExposeAdvance() {
         else            stepFrame(dir);
     }, true);   // capture phase
 }());
+
+// ============================================================
+// POWER MANAGEMENT & INACTIVITY TRACKING
+// ============================================================
+// Sends a lightweight ping to the Flask server when the user
+// interacts with the GUI, keeping the system awake or waking
+// it from standby. Debounced to prevent spanning the server.
+
+let lastPingTime = 0;
+
+function pingActivity() {
+    const now = Date.now();
+    // Throttle the ping to trigger at most once every 30 seconds
+    if (now - lastPingTime > 30000) {
+        lastPingTime = now;
+        fetch('/ping', { method: 'POST' }).catch(() => {});
+    }
+}
+
+// Track general front-end interaction to reset the backend timer
+document.addEventListener('mousemove', pingActivity);
+document.addEventListener('keydown', pingActivity);
+document.addEventListener('click', pingActivity);
+document.addEventListener('touchstart', pingActivity);

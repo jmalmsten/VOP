@@ -12,6 +12,9 @@ Added a little separator to make it more obvious that the ADM mode toggle is a t
 
 ### Expanding the above full screen preview button to the Sheets area as well.
 
+### Screen timeout
+To save on the screens lifetime and processing cycles. A screen timeout has been added that will turn off the screen after 15 minutes of inactivity (1 min during initial testing) and also freeze the idle animation so it doesn't waste energy on frames that aren't being shown anywhere. 
+
 ## Changed:
 
 ### Fixing layout
