@@ -28,3 +28,6 @@ When doing the layout changes above. It looks fine on 16:9 1080p screens. But wh
 
 ### Silencing redundant logs
 When adding the screen timeout I found that the journalctl is spammed with redundant lines where ddcutil tries to find a desktop and there of course is none. So I silenced those logs with a -q flags so they don't clutter up the logs. 
+
+### Fixing the screen timeout
+Turned out the implementation of the screen timeout was a bit naive. So I have done the screen timeout a bit differently now. 
