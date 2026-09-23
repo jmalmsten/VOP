@@ -141,7 +141,7 @@ def ddc_get_power_state():
     """
     try:
         result = subprocess.run(
-            ["ddcutil", "-q", "getvcp", "d6"],
+            ["ddcutil", "getvcp", "d6"],
             capture_output=True, text=True, timeout=5
         )
     except (subprocess.TimeoutExpired, OSError) as e:
@@ -179,7 +179,7 @@ def ddc_set_power(target_value, attempts=3, pause=1.5):
     """
     for attempt in range(1, attempts + 1):
         subprocess.run(
-            ["ddcutil", "-q", "setvcp", "d6", str(target_value)],
+            ["ddcutil", "setvcp", "d6", str(target_value)],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
         time.sleep(pause)  # give the monitor a moment to act before we ask
