@@ -33,6 +33,7 @@ import os
 import sys
 import json
 import subprocess
+import re
 import logging
 import cv2
 import glob
@@ -106,43 +107,163 @@ workprint_process = None
 
 # --- POWER MANAGEMENT GLOBALS ---
 ACTIVITY_TIMEOUT = 1 * 60 #(one minute for testing. Probably should increase to like, 15 minutes for real world use)
+
+# After a sleep attempt the monitor doesn't confirm, wait this long before
+# trying again. Without this, watchdog_loop() would hammer a non-cooperating
+# DDC/CI bus every 10 seconds forever.
+SLEEP_RETRY_COOLDOWN = 5 * 60
+
 last_activity_ts = time.time()
+last_sleep_attempt_ts = 0
 is_asleep = False
 
+# VCP 0xd6 (Power mode) values for THIS monitor - a bare/generic no-name
+# panel (Mfg id "RTK - UNK" per ddcutil detect). Confirmed by hand:
+#   setvcp d6 1 -> getvcp d6 reports sl=0x01 (On)
+#   setvcp d6 4 -> getvcp d6 reports sl=0x02 (Standby) - NOT 0x04!
+# This panel doesn't echo back the value we wrote for "off" - it reports
+# whatever internal state it actually landed in. So DDC_WRITE_SLEEP below
+# is what we WRITE, and DDC_STATE_ON is what we check for on readback -
+# they are deliberately not required to match. See ddc_set_power().
+DDC_WRITE_WAKE = 0x01
+DDC_WRITE_SLEEP = 0x04
+DDC_STATE_ON = 0x01
+
+def ddc_get_power_state():
+    """
+    Query the projection monitor's current DDC/CI power state (VCP 0xd6).
+
+    Returns the integer "sl" value ddcutil reports (0x01 = on, 0x02 =
+    standby, 0x04 = off, etc.), or None if the query failed outright -
+    e.g. the DDC/CI channel dropped after a deep power-down, ddcutil
+    isn't installed, or the I2C bus is momentarily busy.
+
+    We parse the "(sl=0xNN)" suffix ddcutil appends to a non-continuous
+    VCP feature's getvcp output - confirmed against this monitor's real
+    output:
+        VCP code 0xd6 (Power mode ...): DPM: On, DPMS: Off (sl=0x01)
+    """
+    try:
+        result = subprocess.run(
+            ["ddcutil", "getvcp", "d6"],
+            capture_output=True, text=True, timeout=5
+        )
+    except (subprocess.TimeoutExpired, OSError) as e:
+        print(f"[VOP SERVER] ddcutil getvcp could not run: {e}")
+        return None
+
+    if result.returncode != 0:
+        return None
+
+    match = re.search(r"sl=0x([0-9a-fA-F]{2})", result.stdout)
+    if not match:
+        return None
+
+    return int(match.group(1), 16)
+
+
+def ddc_set_power(write_value, verify_awake, attempts=3, pause=1.5):
+    """
+    Command the projection monitor to a DDC/CI power state (VCP 0xd6) and
+    VERIFY it actually took, instead of trusting ddcutil's exit code.
+
+    write_value is what we WRITE (DDC_WRITE_SLEEP / DDC_WRITE_WAKE above).
+    verify_awake is what we're checking for afterwards: True means "is it
+    reporting fully on (DDC_STATE_ON)?", False means "is it reporting
+    anything other than fully on?" We check by MEANING rather than an
+    exact value match, because this monitor doesn't echo back the value
+    we wrote - writing DDC_WRITE_SLEEP (0x04) reads back as 0x02, not
+    0x04 (see the note above DDC_WRITE_WAKE). Matching by meaning instead
+    of by code means this keeps working even if this panel (or a future
+    replacement) reports a different "asleep" code than 0x02.
+
+    Returns True once getvcp confirms the state matches verify_awake,
+    False if it never does after a few attempts. Callers (sleep_system/
+    wake_system below) decide what to do with a False.
+    """
+    for attempt in range(1, attempts + 1):
+        subprocess.run(
+            ["ddcutil", "setvcp", "d6", str(write_value)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        time.sleep(pause)  # give the monitor a moment to act before we ask
+        current = ddc_get_power_state()
+        if current is not None:
+            is_on = (current == DDC_STATE_ON)
+            if is_on == verify_awake:
+                return True
+        print(f"[VOP SERVER] ddcutil verify failed (attempt {attempt}/{attempts}): "
+              f"wrote 0x{write_value:02x}, monitor reports "
+              f"{'0x%02x' % current if current is not None else 'no response'}")
+
+    return False
+
 def wake_system():
-    """Restores display power and resumes the engine process"""
+    """Restores display power and resumes the engine process."""
     global is_asleep, engine_process, last_activity_ts
 
     last_activity_ts = time.time()
     if not is_asleep:
         return
-    
+
     print("[VOP SERVER] Waking system from idle...")
     is_asleep = False
 
-    # Fire DDC/CI wake command to restore hardware display power
-    subprocess.run(["ddcutil", "setvcp", "d6", "01"], stdout= subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # Fire the DDC/CI wake command. Unlike sleep_system() below, we don't
+    # gate anything on whether this is verified: worst case if it fails is
+    # the engine renders to a screen that's still dark, which wastes a
+    # little power but risks nothing - there's no static frame sitting on
+    # a lit panel, so no burn-in concern either way.
+    if not ddc_set_power(DDC_WRITE_WAKE, verify_awake=True):
+        print("[VOP SERVER] WARNING: monitor did not confirm waking. "
+              "Resuming the engine anyway - screen may need a manual nudge.")
 
-    # Resume the persistent engine daemon
+    # Resume the persistent engine daemon regardless of the DDC result above
     if engine_process and engine_process.poll() is None:
         engine_process.send_signal(signal.SIGCONT)
 
 def sleep_system():
-    """Powers down the display and suspends the engine idle loop."""
-    global is_asleep, engine_process
+    """
+    Attempts to power down the display and suspend the engine idle loop.
+
+    Only actually suspends the engine if the monitor CONFIRMS it reached
+    standby. If we can't verify that, there's nothing to gain from
+    freezing the engine - the screen would just be stuck showing whatever
+    frame was on it when we stopped drawing, without saving any power. So
+    on a verify failure we leave the idle animation running: it costs a
+    little extra power, but it also tells you at a glance that sleep
+    failed (something's still moving), instead of silently freezing on a
+    random frame that looks identical to a real crash.
+    """
+    global is_asleep, engine_process, last_sleep_attempt_ts
 
     # Guard: Do not sleep if a job or render is currently executing
     if os.path.exists(COMMAND_FILE): return
     if prores_process and prores_process.poll() is None: return
     if workprint_process and workprint_process.poll() is None: return
 
-    print("[VOP SERVER] System inactive for 1 minute. Suspending.")
-    is_asleep= True
+    # Cooldown: don't hammer the DDC/CI bus every watchdog tick (10s) if
+    # the monitor just refused to cooperate.
+    if time.time() - last_sleep_attempt_ts < SLEEP_RETRY_COOLDOWN:
+        return
+    last_sleep_attempt_ts = time.time()
 
-    # Bypass the DRM graphics pipeline and force the monitor into hardware standby
-    subprocess.run(["ddcutil", "setvcp", "d6", "04"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    print("[VOP SERVER] System inactive. Attempting to suspend display...")
 
-    # Freeze the engine process to save CPU/GPU cycles
+    # Confirmed by hand this monitor actually holds this state (reads
+    # back as Standby, sl=0x02) rather than reverting - see the note
+    # above DDC_WRITE_WAKE for why write/readback values differ here.
+    if not ddc_set_power(DDC_WRITE_SLEEP, verify_awake=False):
+        print("[VOP SERVER] Monitor did not confirm standby - leaving the "
+              "idle animation running instead of freezing on an unconfirmed frame.")
+        return
+
+    print("[VOP SERVER] Display confirmed in standby. Suspending engine.")
+    is_asleep = True
+
+    # Freeze the engine process to save CPU/GPU cycles - only reached once
+    # the display is verified asleep, so this can never leave a static
+    # frame lit on a screen that's actually still on.
     if engine_process and engine_process.poll() is None:
         engine_process.send_signal(signal.SIGSTOP)
 
@@ -750,6 +871,7 @@ def status():
                 hb = json.load(f)
                 return jsonify({
                     "status": "rendering", 
+                    "is_asleep": is_asleep,
                     "heartbeat": hb, 
                     "params": params, 
                     "latest_wp": latest_wp,
@@ -766,6 +888,7 @@ def status():
 
     return jsonify({
         "status": status_state, 
+        "is_asleep": is_asleep,
         "params": params, 
         "latest_wp": latest_wp, 
         "workprint": f"/workprints/{latest_wp}" if latest_wp else None,
