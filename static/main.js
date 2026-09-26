@@ -1375,10 +1375,20 @@ setInterval(async () => {
         // catch block below, which is the ONLY place a failed poll lands.
         // Colour comes from the .sync-online / .sync-offline classes in
         // style.css (no inline style), which we toggle rather than rewrite.
+        // Three states now, not two: reachable-and-awake, reachable-but-
+        // asleep, and unreachable (the OFFLINE case, set in the catch
+        // block below). Asleep still means ONLINE in the sense that the
+        // Pi answered - it's a distinct colour/class, not a replacement
+        // for the offline check.
         const _sync = document.getElementById('sync_indicator');
-        _sync.textContent = '● ONLINE';
-        _sync.classList.remove('sync-offline');
-        _sync.classList.add('sync-online');
+        _sync.classList.remove('sync-offline', 'sync-online', 'sync-asleep');
+        if (st.is_asleep) {
+            _sync.textContent = '● SUSPENDED';
+            _sync.classList.add('sync-asleep');
+        } else {
+            _sync.textContent = '● ONLINE';
+            _sync.classList.add('sync-online');
+        }
         const msgEl = document.getElementById('st_msg');
         const bar = document.getElementById('st_bar');
         const etaEl = document.getElementById('st_eta');
@@ -1458,7 +1468,7 @@ setInterval(async () => {
         // reading ONLINE and nothing ever flipped it back when the Pi died.
         const _sync = document.getElementById('sync_indicator');
         _sync.textContent = '○ OFFLINE';
-        _sync.classList.remove('sync-online');
+        _sync.classList.remove('sync-online', 'sync-asleep');
         _sync.classList.add('sync-offline');
     }
 }, 1000);
