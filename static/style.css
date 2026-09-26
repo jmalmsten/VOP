@@ -86,7 +86,8 @@ Description:        Stylings for the whole GUI
     --color-panic:          #800;       /* Hardware Panic button */
 
     --color-online:         #0f0;       /* Sync indicator: Pi web server reachable  */
-    --color-offline:        #f44;       /* Sync indicator: polling is failing 
+    --color-offline:        #f44;       /* Sync indicator: polling is failing */
+    --color-asleep:         #fc0;       /* Sync indicator: Pi is reachable, display suspended */
 
     /* >>> Background & Panels <<< */
 
@@ -262,6 +263,9 @@ body {
 }
 #sync_indicator.sync-offline { 
     color:  var(--color-offline); 
+}
+#sync_indicator.sync-asleep {
+    color:  var(--color-lasleep);
 }
 
 /* ===========================================================

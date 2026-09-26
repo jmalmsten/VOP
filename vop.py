@@ -871,6 +871,7 @@ def status():
                 hb = json.load(f)
                 return jsonify({
                     "status": "rendering", 
+                    "is_asleep": is_asleep,
                     "heartbeat": hb, 
                     "params": params, 
                     "latest_wp": latest_wp,
@@ -887,6 +888,7 @@ def status():
 
     return jsonify({
         "status": status_state, 
+        "is_asleep": is_asleep,
         "params": params, 
         "latest_wp": latest_wp, 
         "workprint": f"/workprints/{latest_wp}" if latest_wp else None,
