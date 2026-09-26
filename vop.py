@@ -117,13 +117,17 @@ last_activity_ts = time.time()
 last_sleep_attempt_ts = 0
 is_asleep = False
 
-# VCP 0xd6 (Power mode) values, confirmed against this monitor's actual
-# `ddcutil getvcp d6` output: "DPM: On, DPMS: Off (sl=0x01)" while on.
-DDC_POWER_ON = 0x01
-# Standby, not hard "off" (0x04). A shallower DPMS state is far more likely
-# to leave the monitor's DDC/CI channel alive, so the wake command later
-# actually has something on the other end to listen to it.
-DDC_POWER_STANDBY = 0x02
+# VCP 0xd6 (Power mode) values for THIS monitor - a bare/generic no-name
+# panel (Mfg id "RTK - UNK" per ddcutil detect). Confirmed by hand:
+#   setvcp d6 1 -> getvcp d6 reports sl=0x01 (On)
+#   setvcp d6 4 -> getvcp d6 reports sl=0x02 (Standby) - NOT 0x04!
+# This panel doesn't echo back the value we wrote for "off" - it reports
+# whatever internal state it actually landed in. So DDC_WRITE_SLEEP below
+# is what we WRITE, and DDC_STATE_ON is what we check for on readback -
+# they are deliberately not required to match. See ddc_set_power().
+DDC_WRITE_WAKE = 0x01
+DDC_WRITE_SLEEP = 0x04
+DDC_STATE_ON = 0x01
 
 def ddc_get_power_state():
     """
@@ -158,36 +162,38 @@ def ddc_get_power_state():
     return int(match.group(1), 16)
 
 
-def ddc_set_power(target_value, attempts=3, pause=1.5):
+def ddc_set_power(write_value, verify_awake, attempts=3, pause=1.5):
     """
     Command the projection monitor to a DDC/CI power state (VCP 0xd6) and
     VERIFY it actually took, instead of trusting ddcutil's exit code.
 
-    A zero exit code from `setvcp` only means the write was acknowledged
-    on the I2C bus - it does NOT mean the monitor changed state. This
-    Pi's HDMI DDC/CI channel can ack a write and then not follow through,
-    or drop out entirely once the panel is in a deep power-down. So we
-    always read the state back with getvcp and only report success if it
-    matches what we asked for.
+    write_value is what we WRITE (DDC_WRITE_SLEEP / DDC_WRITE_WAKE above).
+    verify_awake is what we're checking for afterwards: True means "is it
+    reporting fully on (DDC_STATE_ON)?", False means "is it reporting
+    anything other than fully on?" We check by MEANING rather than an
+    exact value match, because this monitor doesn't echo back the value
+    we wrote - writing DDC_WRITE_SLEEP (0x04) reads back as 0x02, not
+    0x04 (see the note above DDC_WRITE_WAKE). Matching by meaning instead
+    of by code means this keeps working even if this panel (or a future
+    replacement) reports a different "asleep" code than 0x02.
 
-    target_value: the sl value to set (see DDC_POWER_ON / DDC_POWER_STANDBY
-    above).
-
-    Returns True if getvcp confirms the monitor reached target_value,
-    False otherwise. Callers (sleep_system/wake_system below) decide what
-    to do with a False - they treat it differently depending on direction.
+    Returns True once getvcp confirms the state matches verify_awake,
+    False if it never does after a few attempts. Callers (sleep_system/
+    wake_system below) decide what to do with a False.
     """
     for attempt in range(1, attempts + 1):
         subprocess.run(
-            ["ddcutil", "setvcp", "d6", str(target_value)],
+            ["ddcutil", "setvcp", "d6", str(write_value)],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
         time.sleep(pause)  # give the monitor a moment to act before we ask
         current = ddc_get_power_state()
-        if current == target_value:
-            return True
+        if current is not None:
+            is_on = (current == DDC_STATE_ON)
+            if is_on == verify_awake:
+                return True
         print(f"[VOP SERVER] ddcutil verify failed (attempt {attempt}/{attempts}): "
-              f"wanted 0x{target_value:02x}, monitor reports "
+              f"wrote 0x{write_value:02x}, monitor reports "
               f"{'0x%02x' % current if current is not None else 'no response'}")
 
     return False
@@ -208,7 +214,7 @@ def wake_system():
     # the engine renders to a screen that's still dark, which wastes a
     # little power but risks nothing - there's no static frame sitting on
     # a lit panel, so no burn-in concern either way.
-    if not ddc_set_power(DDC_POWER_ON):
+    if not ddc_set_power(DDC_WRITE_WAKE, verify_awake=True):
         print("[VOP SERVER] WARNING: monitor did not confirm waking. "
               "Resuming the engine anyway - screen may need a manual nudge.")
 
@@ -244,8 +250,10 @@ def sleep_system():
 
     print("[VOP SERVER] System inactive. Attempting to suspend display...")
 
-    # Standby (0x02), not hard off (0x04) - see DDC_POWER_STANDBY above.
-    if not ddc_set_power(DDC_POWER_STANDBY):
+    # Confirmed by hand this monitor actually holds this state (reads
+    # back as Standby, sl=0x02) rather than reverting - see the note
+    # above DDC_WRITE_WAKE for why write/readback values differ here.
+    if not ddc_set_power(DDC_WRITE_SLEEP, verify_awake=False):
         print("[VOP SERVER] Monitor did not confirm standby - leaving the "
               "idle animation running instead of freezing on an unconfirmed frame.")
         return
