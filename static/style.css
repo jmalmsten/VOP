@@ -265,7 +265,7 @@ body {
     color:  var(--color-offline); 
 }
 #sync_indicator.sync-asleep {
-    color:  var(--color-lasleep);
+    color:  var(--color-asleep);
 }
 
 /* ===========================================================
