@@ -1,4 +1,4 @@
-# v26.2.6
+# v26.2.7
 
 ## Notes: 
 The second release since the big move to GitHub. 
@@ -53,3 +53,6 @@ As the repo has moved from codeberg to github. And issue numbers don't match. I 
 
 ### Patch 6: removed instructions.md
 Since alignment and focus is done in the webGUI that file was now deemed redundant.
+
+### Patch 7: Fixed unused admClear()
+During cleanup in Patch 6 I found that admClear() was not actually used anywhere and the button that should call it was not used either. Should be fixed now. 

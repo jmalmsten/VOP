@@ -2814,6 +2814,19 @@ function stepKeyframe(dir) {
     runTask('preview');
 }
 
+/* C - release the projection hold; the panel returns to the idle
+ * animation within a frame. Screen only: no latent, mag or sheet is
+ * touched (once expossed, it's exposed). Plain Flask route, no engine
+ * dispatch, so it works instantly even while the engine is mid-task.
+ * Fire-and-forget: a network hiccup just means pressing C again. */
+async function admClear() {
+    try {
+        await fetch('/adm_clear', { method: 'POST' });
+    } catch (e) {
+        console.error('[ADM] clear-hold request failed:', e);
+    }
+}
+
 /* True while an ADM exposure is in flight. One flag guarding three
  * hazards through one funnel: double-tapping an EXPOSE button, scrubbing
  * the playhead mid-shot (confusing at best - the heartbeat would claim
