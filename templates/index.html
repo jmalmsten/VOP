@@ -396,7 +396,7 @@
                              it is a mode toggle, not a page, and this is
                              the spot it changes: it swaps Execute Sequence
                              for the EXPOSE buttons and stepper just above.
-                             id="Adm_enabled" matches the job key, so the
+                             id="adm_enabled" matches the job key, so the
                              generic hydration  loop in main.js restores the
                              tick state from a saved job as well. -->
                         
@@ -405,7 +405,7 @@
                                 <input type="checkbox" id="exec_live_preview" onchange="saveJob()">
                                 Live preview
                             </label>
-                            <label class="exec-live-preview-toggle" title="Animation Desk Mode - expose frames one at a time by hand and use the mags/bipacks projection as a lit background for arwork placed under the lens of burn in elements frame by frame">
+                            <label class="exec-live-preview-toggle" title="Animation Desk Mode - expose frames one at a time by hand and use the mags/bipacks projection as a lit background for artwork placed under the lens of burn in elements frame by frame">
                                 <input type="checkbox" id="adm_enabled" onchange="toggleADM()">
                                 ADM
                             </label>
@@ -670,8 +670,8 @@
                             leaving the mode. */
             function setADM(on) {
                 document.body.classList.toggle('adm-mode', on);
-                // Keep the checkbox in step with the body class, so hydraiton
-                // (whick calls setADM) and the user action can never disagree.
+                // Keep the checkbox in step with the body class, so hydration
+                // (which calls setADM) and the user action can never disagree.
                 document.getElementById('adm_enabled').checked = on;
             }
 
