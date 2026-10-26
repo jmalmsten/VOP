@@ -32,7 +32,7 @@
 <head>
     <meta charset="UTF-8">
     <title>VOP v26.1</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=56">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=57">
 </head>
 <body>
     <div class="container">
@@ -55,17 +55,6 @@
                 <button type="button" class="page-nav-btn" id="nav_calibration_btn"
                         onclick="showPage('calibration')"
                         title="Calibration - Peak White measurement and optical calibration tools.">Calibration</button>
-                <!-- ADM is NOT a page - it's a mode TOGGLE sharing the same row.
-                    Clicking it flips body.adm-mode (see toggleADM below), which on the
-                    Main page swaps the Execute Sequence button for the hand-exposure
-                    and frame-stepper controls. Grey when off, green when on. Because
-                    Main is normally the active (green) page, turning ADM on lights two
-                    green buttons in the row - Main (the page) and ADM (the mode) -
-                    which is the intended "we're in ADM now" cue. -->
-                &nbsp; - &nbsp;
-                <button type="button" class="page-nav-btn" id="nav_adm_btn"
-                        onclick="toggleADM()"
-                        title="Animation Desk Mode - expose frames one at a time by hand and use the mags/bipacks projection as a lit background for artwork placed under the lens.">ADM</button>
             </div>
 
             <!-- Engine connection indicator. Lit when /status returns
@@ -401,20 +390,26 @@
                             <button class="action-btn" onclick="stepFrame(1)"     title="Step forward one frame ( . )">&rsaquo;</button>
                             <button class="action-btn" onclick="stepKeyframe(1)"  title="Next keyframe (Shift + .)">&raquo;</button>
                         </div>
-                        <!-- LIVE PREVIEW toggle (issue #205). When ticked, the
-                             preview window refreshes with each frame as it
-                             commits during an Execute job - for monitoring
-                             progress and for livestream/marketing capture. OFF
-                             by default: the per-frame TIFF re-read + JPG encode
-                             can measurably slow a job on slow storage. When OFF,
-                             Cam View / Cam Probe still work to peek into CamMag
-                             mid-job (we never auto-touch the preview then). The
-                             backend reads this id from the saved job as
-                             job_data['exec_live_preview']. PAR-aware downstream. -->
-                        <label class="exec-live-preview-toggle" title="Refresh the preview window after each frame is exposed during an Execute job. Off by default - adds a small per-frame cost. PAR-aware: respects Preview Unsqueeze.">
-                            <input type="checkbox" id="exec_live_preview" onchange="saveJob()">
-                            Live preview
-                        </label>
+
+                        <!-- Toggle row under the exec buttons: Live preview
+                             and ADM sit side by side. ADM lives here because
+                             it is a mode toggle, not a page, and this is
+                             the spot it changes: it swaps Execute Sequence
+                             for the EXPOSE buttons and stepper just above.
+                             id="Adm_enabled" matches the job key, so the
+                             generic hydration  loop in main.js restores the
+                             tick state from a saved job as well. -->
+                        
+                        <div class="exec-toggle-row">
+                            <label class="exec-live-preview-toggle" title="Refresh the preview window after each frame is exposed during an Execute job. OFf by default - Adds a small per-frame cost. PAR-aware: respects Preview unsqueeze.">
+                                <input type="checkbox" id="exec_live_preview" onchange="saveJob()">
+                                Live preview
+                            </label>
+                            <label class=""exec-live-preview-toggle" title="Animation Desk Mode - expose frames one at a time by hand and use the mags/bipacks projection as a lit background for arwork placed under the lens of burn in elements frame by frame">
+                                <input type="checkbox" id="adm_enabled" onchange="toggleADM()">
+                                ADM
+                            </label>
+                        </div>
                     </div>
                 </div>
 
@@ -675,8 +670,9 @@
                             leaving the mode. */
             function setADM(on) {
                 document.body.classList.toggle('adm-mode', on);
-                // Mirror onto the nav button so it paints green while on.
-                document.getElementById('nav_adm_btn').classList.toggle('adm-on', on);
+                // Keep the checkbox in step with the body class, so hydraiton
+                // (whick calls setADM) and the user action can never disagree.
+                document.getElementById('adm_enabled').checked = on;
             }
 
             function toggleADM() {

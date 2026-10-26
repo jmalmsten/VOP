@@ -1,4 +1,4 @@
-# v26.2.4
+# v26.2.5
 
 ## Notes: 
 The second release since the big move to GitHub. 
@@ -27,6 +27,8 @@ When screen goes into timeout, there's now a third state, color coded yellow, to
 ### Patch 1: Fixing layout
 rearranged a few of the sections to better use the screen real estate. 
 
+### Patch 5: moving ADM toggle
+I realized that if it's hard for me to remember that the `ADM` button is not a page, but a toggle... It's downright impossible for those outside my head to know this as well. So I have now moved it from the row of pages to the row under the `EXECUTE SEQUENCE` button and made it into a regular checkbox to make it more clear what it does and it also makes more sense to have it near where the buttons for `ADM` will appear anyway.  
 
 ## Fixed:
 
