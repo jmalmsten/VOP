@@ -44,15 +44,15 @@ let dreMasterCount = 0;
 let brkMasterCount = 0;
 let isFirstLoad = true;
 let isEngineRunning = false;
-// Tracks the last heartbeat frame we refreshed the live preview for (issue
-// #205), so we reload probe_live.jpg only when the engine advances to a new
+// Tracks the last heartbeat frame we refreshed the live preview
+// so we reload probe_live.jpg only when the engine advances to a new
 // frame rather than on every 1s poll. -1 = "no job seen yet / reset".
 let _lastLivePreviewFrame = -1;
 let currentMode = 'SSS'; // <-- tracks the current active mode and sets the initial default.
 
 // Initialize the dropdown listener when the DOM loads
 document.addEventListener('DOMContentLoaded', () => {
-    // issue #185: repaint the luma waveform whenever a new preview JPEG
+    // Repaint the luma waveform whenever a new preview JPEG
     // decodes. Every probe/preview/live-frame path swaps #probe_img.src,
     // and they all fire this one 'load' event - so this single listener
     // covers all of them.
@@ -210,7 +210,7 @@ async function uploadFile(inputId, textId, endpoint) {
     }
 }    
     
-/* TARGET AR -> PAR helper (issue #199)
+/* TARGET AR -> PAR helper
  *
  * Anamorphic convenience calculator. The user types the final aspect
  * ratio they want the PROJECTED image to read as (Target AR, e.g.
@@ -454,7 +454,7 @@ async function runCamProbe() {
 }
 
 // ============================================================
-//  WAVEFORM SCOPES  (issue #185)
+//  WAVEFORM SCOPES
 // ------------------------------------------------------------
 //  Two stacked scopes, both DISPLAY-REFERRED (they read the 8-bit
 //  preview JPEG, not the linear 16-bit latent):
@@ -870,9 +870,9 @@ function reindexMDS() {
 // an existing concept (POS, ROT, GATE, CAM, STP, gels) so the
 // engine's spatial-transform and JK-printer parsing can reuse the
 // existing code paths once the engine-side BRK mode branch is in
-// place (slice 12). The fields that DON'T map to existing concepts
+// place. The fields that DON'T map to existing concepts
 // (per-job bracket_count and bracket_stops) are not per-keyframe;
-// those land in the Hardware Constants section in slice 9.
+// those land in the Hardware Constants section in.
 //
 // Fields per keyframe:
 //   brk_f<n>                   frame number
@@ -1299,9 +1299,6 @@ setInterval(async () => {
             // 2. Clear out any existing rows to prevent duplicates
             document.getElementById('mds_sheet_body').innerHTML = '';
             document.getElementById('sss_sheet_body').innerHTML = '';
-            // Defensive existence check: brk_sheet_body only exists after
-            // slice 8 lands. Older clients reloading saved jobs without
-            // the new template would crash without this guard.
             const brkBody = document.getElementById('brk_sheet_body');
             if (brkBody) brkBody.innerHTML = '';
             mdsMasterCount = 0;
@@ -1311,8 +1308,6 @@ setInterval(async () => {
             // 3. Dynamically build the exact number of empty HTML rows needed
             for (let i = 0; i < maxMDS; i++) addMDSKeyframe();
             for (let i = 0; i < maxSSS; i++) addSSSKeyframe();
-            // BRK rows only if the template loaded - older saved jobs
-            // running on pre-slice-8 clients shouldn't error here.
             if (brkBody) {
                 for (let i = 0; i < maxBRK; i++) addBRKKeyframe();
             }
@@ -1325,7 +1320,7 @@ setInterval(async () => {
                     if (el.type === 'checkbox') el.checked = (v === true || v === 'true');
                     else el.value = v;
 
-                    // SELECT safety net (issue #208). Setting a <select> to a value
+                    // SELECT safety net. Setting a <select> to a value
                     // that matches no <option> (e.g. a legacy non-native cam_res
                     // saved before this dropdown existed) silently leaves
                     // selectedIndex at -1 and the control renders blank. Snap to
@@ -1399,7 +1394,7 @@ setInterval(async () => {
             msgEl.innerText = `${st.heartbeat.msg} [${st.heartbeat.current}/${st.heartbeat.total}]`;
             bar.style.width = (st.heartbeat.current/st.heartbeat.total*100) + "%";
 
-            // LIVE PREVIEW (issue #205). If the operator ticked "Live preview"
+            // LIVE PREVIEW. If the operator ticked "Live preview"
             // by Execute Sequence, refresh the preview window when the engine
             // moves to a new frame. The engine writes probe_live.jpg right
             // AFTER each frame commits, so the natural reading is: when the
@@ -1429,12 +1424,12 @@ setInterval(async () => {
             if (isEngineRunning) {
                 document.getElementById('probe_img').src = '/static/probe_live.jpg?t=' + Date.now();
                 isEngineRunning = false;
-                _lastLivePreviewFrame = -1;   // reset for the next job (issue #205)
+                _lastLivePreviewFrame = -1;   // reset for the next job
                 // Calibration page may have a task in flight that
                 // just completed. Let its controller refresh its
                 // readouts and re-enable its buttons. Safe to call
                 // every time - it no-ops when no calibration task
-                // was in flight. See slice 7's calibration.onEngineComplete().
+                // was in flight.
                 if (typeof calibration !== 'undefined' && calibration.onEngineComplete) {
                     calibration.onEngineComplete();
                 }
@@ -1871,11 +1866,10 @@ async function importJob(input) {
     }
 }
 // ====================================================================
-// CALIBRATION PAGE CONTROLLER (slice 7)
+// CALIBRATION PAGE CONTROLLER
 // ====================================================================
 //
-// Wires up the Peak White calibration controls to the engine endpoints
-// added in slice 5. Hooks into the existing /status polling loop rather
+// Hooks into the existing /status polling loop rather
 // than running its own timer - see the calibration_store.py module
 // docstring for the IPC busy-state convention this relies on.
 //
@@ -1897,11 +1891,11 @@ async function importJob(input) {
 //
 // All DOM ids match the IDs declared in templates/sections/calibration.html.
 // Buttons are wired by id, not by inline onclick, so the HTML stays free
-// of JS coupling and slice 6 part 2 can be re-styled or restructured
+// of JS coupling and can be re-styled or restructured
 // without breaking the JS bindings here.
 
 // ====================================================================
-// FRAMING & FOCUS controller (issue #198)
+// FRAMING & FOCUS controller
 //
 // Drives the live camera feed on the Calibration page. Starting the
 // feed POSTs /calibration_feed/start (which refuses if the engine is
@@ -1924,7 +1918,7 @@ const framing = {
         if (startBtn) startBtn.addEventListener('click', () => this.startFeed());
         if (stopBtn)  stopBtn.addEventListener('click',  () => this.stopFeed());
 
-        // 1:1 focus zoom (Slice 4): the toggle button + the click-drag pan.
+        // 1:1 focus zoom: the toggle button + the click-drag pan.
         const zoomBtn = document.getElementById('cal_feed_zoom_btn');
         if (zoomBtn) zoomBtn.addEventListener('click', () => this.toggleZoom());
         this.initZoomPan();
@@ -2224,7 +2218,7 @@ const calibration = {
     },
 
     // ----------------------------------------------------------------
-    // Task triggers (POST to slice 5 routes)
+    // Task triggers
     // ----------------------------------------------------------------
 
     async runSingle() {

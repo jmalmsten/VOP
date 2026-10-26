@@ -40,12 +40,12 @@ Layout: 2-column grid inherited from .page-section.page-active.
   Right column = measurement controls + current calibration readout
 
 All styling lives in static/style.css per project convention.
-No JS event handlers here - those are wired up by slice 7 in main.js.
+No JS event handlers here.
 -->
 
 <!-- LEFT COLUMN: preview window. Now a STACK so the live framing feed
-     (issue #198) and the still capture can occupy the same box, with a
-     future alignment overlay layered on top (Slice 3). Only one of the
+     and the still capture can occupy the same box, with a
+     alignment overlay layered on top. Only one of the
      two images is visible at a time:
        - cal_probe_img : still from the last measurement (default)
        - cal_feed_img  : live MJPEG feed, shown while framing is active
@@ -56,7 +56,7 @@ No JS event handlers here - those are wired up by slice 7 in main.js.
     <div class="cal-preview-stack" id="cal_preview_stack">
         <img id="cal_probe_img" alt="Calibration Capture Preview">
         <img id="cal_feed_img" alt="Live Framing Feed">
-        <!-- Aspect-aware framing overlay (issue #198, Slice 3).
+        <!-- Aspect-aware framing overlay.
              preserveAspectRatio="xMidYMid meet" letterboxes the viewBox the
              SAME way the feed <img>'s object-fit:contain does, so boxes drawn
              in viewBox units (sensor pixels) line up with the camera image at
@@ -71,13 +71,12 @@ No JS event handlers here - those are wired up by slice 7 in main.js.
 
 <!-- RIGHT COLUMN: measurement controls + readout. -->
 <div class="cal-controls-area">
-    <!-- Framing & Focus (issue #198).
+    <!-- Framing & Focus.
          Starts/stops the live camera feed shown in the left preview box,
          for setting physical camera XYZ / PTR / zoom / focus between jobs.
          The feed holds the sensor, so starting it is refused while a job
          is running, and it auto-stops when a measurement starts or when
-         the user leaves this page (wired in main.js). On-screen alignment
-         targets and the corner-box overlay arrive in later slices. -->
+         the user leaves this page (wired in main.js). -->
     <div class="group-box">
         <div class="group-title">Framing &amp; Focus</div>
 
@@ -93,7 +92,7 @@ No JS event handlers here - those are wired up by slice 7 in main.js.
                     title="Stop the live feed and release the camera.">STOP FEED</button>
         </div>
 
-        <!-- 1:1 focus zoom toggle (Slice 4). Label flips between 1:1 FOCUS
+        <!-- 1:1 focus zoom toggle. Label flips between 1:1 FOCUS
              and FIT VIEW in main.js. Only does anything while the feed is
              live (it needs an image to zoom into). -->
         <div class="input-row spaced">
@@ -108,8 +107,7 @@ No JS event handlers here - those are wired up by slice 7 in main.js.
     <div class="group-box">
         <div class="group-title">Peak White</div>
 
-        <!-- Status indicator. Simple "Ready" / "Measuring" text.
-             Slice 7 updates this based on /status polling. -->
+        <!-- Status indicator. Simple "Ready" / "Measuring" text. -->
         <div class="cal-status-row">
             <span class="cal-status-label">Status:</span>
             <span id="cal_status_text" class="cal-status-text">Ready</span>
@@ -170,8 +168,7 @@ No JS event handlers here - those are wired up by slice 7 in main.js.
              The checkbox is opt-in: enabling it makes ACB run one
              extra capture at T_peak with a black target after
              convergence, persisting the noise floor to calibration.json
-             under black_floor_at_t_peak. Slice 7 handles the
-             two-step sequencing. -->
+             under black_floor_at_t_peak. -->
         <div class="input-row spaced cal-acb-trigger-row">
             <button type="button" class="action-btn" id="cal_acb_btn"
                     title="Auto Calibrate for Brackets. Runs ACB and persists T_peak on convergence.">ACB</button>
@@ -183,8 +180,7 @@ No JS event handlers here - those are wired up by slice 7 in main.js.
     </div>
 
     <!-- Current calibration state readout.
-         Pulled from /calibration_state and refreshed by slice 7's
-         JS after each measurement. This is where the user sees
+         Pulled from /calibration_state and refreshed by JS after each measurement. This is where the user sees
          "what's the current T_peak the engine will use for BRK?". -->
     <div class="group-box">
         <div class="group-title">Current Calibration</div>   

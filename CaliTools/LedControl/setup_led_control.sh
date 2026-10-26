@@ -20,7 +20,7 @@
 #   3. chgrp's the 'brightness' file to 'gpio' and makes it group-writable,
 #      so the VOP user can write 0/1 at runtime without root.
 #
-# The actual 0/1 toggling lives in modules/leds.py + the engine (Phase 2).
+# The actual 0/1 toggling lives in modules/leds.py + the engine.
 # This script only sets the stage at boot.
 
 set -u   # error on unset vars. Deliberately NOT 'set -e': if one LED node

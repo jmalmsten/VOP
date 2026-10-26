@@ -85,7 +85,7 @@ def init_render_pipeline():
     uniform float slice_low;
     uniform float slice_high;
 
-    // SWEEP uniforms (issue #230).
+    // SWEEP uniforms.
     // sweep_mode selects the luma-window filter applied to this
     // layer's pass: 0 = Bypass (default, shader behaves exactly
     // as pre-sweep), 1 = High Pass, 2 = Band Pass, 3 = Low Pass.
@@ -122,7 +122,7 @@ def init_render_pipeline():
             tex_col.rgb = clamp((tex_col.rgb - slice_low) / slice_width, 0.0, 1.0);
         }
 
-        // SWEEP LUMA-WINDOW FILTER (issue #230)
+        // SWEEP LUMA-WINDOW FILTER
         //
         // Runs AFTER the BRK slice remap (so it sees the same
         // values the panel would show) and BEFORE the gel
@@ -202,7 +202,7 @@ def init_render_pipeline():
     if 'slice_high' in prog:
         prog['slice_high'].value = 1.0
     
-    # SWEEP defaults (issue #230): initialize to Bypass so every
+    # SWEEP defaults: initialize to Bypass so every
     # code path that never touches the sweep uniforms - idle
     # branding, calibration, DRE, BRK, previews, everything -
     # renders exactly as it did before the sweep existed. The
@@ -234,7 +234,7 @@ def init_render_pipeline():
 def init_calibration_targets(ctx):
     """
     Build a SECOND, independent program + fullscreen quad that draws the
-    framing/focus targets (issue #198): corner crosshairs at a 10% inset
+    framing/focus targets: corner crosshairs at a 10% inset
     plus a centre moire (Siemens-star) focus pattern.
 
     Kept entirely separate from init_render_pipeline's textured-quad
@@ -296,8 +296,8 @@ def init_calibration_targets(ctx):
 
         // ---- CORNER CROSSHAIRS (10% inset from each edge) ----
         // A '+' at each of the four corners. Their CENTRES (0.1 / 0.9 in
-        // uv) are exactly what the feed-overlay boxes will target in
-        // Slice 3, and those centres are aspect-independent, which is why
+        // uv) are exactly what the feed-overlay boxes will target
+        // and those centres are aspect-independent, which is why
         // the crosshairs stay in plain uv space (only the centre circle
         // needs aspect correction). t = arm thickness, l = arm half-length.
         float t = 0.0015;
@@ -430,7 +430,7 @@ class TextureManager:
         texture with a default 16:9 aspect ratio - the engine's render path
         special-cases white_tex to skip the geometry transform entirely.
         
-        Bit-depth handling (phase 2 of issue #169):
+        Bit-depth handling:
             OpenCV preserves the source dtype when reading 16-bit TIFFs, so 
             cv2.imread returns either uint8 or uint16 arrays depending on 
             the file. We detect this and upload accordingly:
@@ -478,7 +478,7 @@ class TextureManager:
         # cv2.IMREAD_UNCHANGED preserves both the alpha channel (for PNGs) 
         # AND the source bit depth (8 vs 16). Without this flag, OpenCV 
         # would auto-strip alpha AND silently downcast 16-bit TIFFs to 
-        # uint8 - which is exactly the 8bpc ceiling phase 2 is removing.
+        # uint8
         img = cv2.imread(f_path, cv2.IMREAD_UNCHANGED)
         if img is None: 
             return self.white_tex, 1.777
@@ -518,7 +518,7 @@ class TextureManager:
             # have COMPLETELY different bit layouts. A uint16 value of 65535 
             # would, if reinterpreted as a float16, be +Inf - not 1.0. So we 
             # cannot just hand the uint16 buffer to moderngl with dtype='f2' 
-            # and hope for the best (an earlier phase-2 implementation did 
+            # and hope for the best (an earlier implementation did 
             # exactly this and produced garbage on real 16-bit gradient 
             # sources - looked plausible on solid colors but wrong on ramps).
             # 

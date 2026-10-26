@@ -103,7 +103,7 @@ Description:        Stylings for the whole GUI
     --graphic-w: 256px;   /* schematic display size = 50% of the 512x256 source */
     --graphic-h: 128px;
 
-    /* issue #185: the preview panel's height. Shared so the waveform scope
+    /* The preview panel's height. Shared so the waveform scope
      * beside it can pin to the exact same value - otherwise the scope
      * stretches to the (taller) grid row height set by the controls column. */
     --preview-h: 50vh;
@@ -145,7 +145,7 @@ Description:        Stylings for the whole GUI
     --tag-bipack2-border:   #075;
     --bg-sss-tag:           #331122;    /* Background for the SSS add-row button */
 
-    /* >>> Wood frame (makeover placeholder) <<< */
+    /* >>> Wood frame <<< */
     /* Solid "wood block" cheeks that flank the active page, evoking old
        electronics: a central black board (the dark UI) framed by solid
        wood end-pieces. These are placeholders only — real tileable wood
@@ -486,7 +486,7 @@ body.adm-mode .adm-step-row    { display: flex; }
  * readout.
  *
  * The colour-coded readout uses .ok / .warn / .danger / .info
- * modifier classes that slice 7's JS sets dynamically based on
+ * modifier classes that JS sets dynamically based on
  * measured brightness. The colours match the meaning we agreed
  * during planning: green = sensible high but not clipped,
  * yellow = one or more channels are clipping, red = full clip,
@@ -500,13 +500,12 @@ body.adm-mode .adm-step-row    { display: flex; }
     justify-self:       stretch; /* Fill the column width */
     align-self:         stretch; /* Stretch to match the height of the control stack */
 
-    /* Width fix - issue #202. The Main preview's flex item is a bare <img>
+    /* Width fix. The Main preview's flex item is a bare <img>
      * whose intrinsic width drives .preview-area's width:auto. Here the flex
      * item is .cal-preview-stack - a <div> with width:100% and NO intrinsic
      * width - so width:100% is circular against the auto-width parent, the
      * flex container has nothing to size against, and it collapses to its
-     * inherited min-width (300px) while height:50vh stays put. That 300px x
-     * 50vh box is the tall ~9:16 sliver the issue describes.
+     * inherited min-width (300px) while height:50vh stays put.
      *
      * Pinning an explicit width gives the panel a definite landscape size.
      * 70vh equals .preview-area's own max-width cap, so the box is 70vh x
@@ -527,10 +526,10 @@ body.adm-mode .adm-step-row    { display: flex; }
     grid-column:        2;
 }
 
-/* Framing/focus preview stack (issue #198). The wrapper fills the
+/* Framing/focus preview stack. The wrapper fills the
  * preview box and positions its two <img> children on top of each
  * other so the live feed and the still capture share the same space.
- * A future alignment overlay (Slice 3) becomes a third absolutely-
+ * A future alignment overlay becomes a third absolutely-
  * positioned child here. */
 .cal-preview-stack {
     position:           relative;
@@ -559,7 +558,7 @@ body.adm-mode .adm-step-row    { display: flex; }
 .cal-preview-stack.feed-active #cal_feed_img  { display: block; }
 .cal-preview-stack.feed-active #cal_probe_img { display: none;  }
 
-/* Framing overlay (issue #198, Slice 3). Fills the stack; its SVG content
+/* Framing overlay. Fills the stack; its SVG content
  * auto-letterboxes to coincide with the feed image. Hidden until framing
  * is active. pointer-events:none so the overlay never swallows clicks -
  * right-click -> "open feed in new tab" keeps working through it. */
@@ -602,7 +601,7 @@ body.adm-mode .adm-step-row    { display: flex; }
     vector-effect:      non-scaling-stroke;
 }
 
-/* ---- 1:1 FOCUS ZOOM (issue #198, Slice 4) ----
+/* ---- 1:1 FOCUS ZOOM ----
  * In zoom mode the feed renders at native sensor pixels and the stack
  * becomes a fixed-size viewport the operator pans by click-dragging
  * (main.js sets scrollLeft/scrollTop - DOM properties, never inline
@@ -659,7 +658,7 @@ body.adm-mode .adm-step-row    { display: flex; }
 }
 
 /* Measurement-result readout. Used for the Single Measurement
- * numeric output. Slice 7's JS sets one of the modifier classes
+ * numeric output. JS sets one of the modifier classes
  * (.ok / .warn / .danger / .info) to colour-code the value. */
 .cal-readout {
     font-family:        monospace;
@@ -957,7 +956,7 @@ body.adm-mode .adm-step-row    { display: flex; }
  *     <span class="gf-live">----/----</span>    <- the lit value (JS updates this)
  *   </span>
  *
- * .gate-frames is the black recessed window (the "Doc Brown" inset). The ghost
+ * .gate-frames is the black recessed window (the deLorean styled segmented display inset). The ghost
  * sits absolutely behind the live layer showing every segment dimly, so unlit
  * segments are implied the way a real LED panel shows them. Only .gf-live is
  * ever touched by JS (renderGate sets its text); the ghost is a static 8888/8888.
@@ -1037,7 +1036,7 @@ body.adm-mode .adm-step-row    { display: flex; }
     color:              var(--text-secondary); 
 }
 
-/* Selects added to the selector (issue #230): the Sweep dropdowns are
+/* Selects added to the selector: the Sweep dropdowns are
  * the first <select> elements to live inside a .c-box, and without
  * this they fell through to the browser's default white widget while
  * every .const-group select (Cam Res etc.) was already dark-themed. */
@@ -1091,7 +1090,7 @@ body.adm-mode .adm-step-row    { display: flex; }
      *     the image works as expected and letterboxes instead of
      *     cropping.
      *   - min-* values are safety floors for short/narrow viewports. */
-    /* issue #185 alignment: border-box so height:var(--preview-h) is the
+    /* alignment: border-box so height:var(--preview-h) is the
      * OUTER height. This panel has a 1px border and no padding, so on its
      * own the difference is tiny - but pairing it with the waveform panel
      * (which DOES have padding) only lines up if both measure height the
@@ -1126,7 +1125,7 @@ body.adm-mode .adm-step-row    { display: flex; }
     object-fit:         contain;
 }
 
-/* ############### Waveform scope (issue #185) ############### */
+/* ############### Waveform scope ############### */
 
 /* The preview+scope row. Takes grid-column 1 - the slot .preview-area
  * used to hold directly. The pair is centred in the 1fr track, so the
@@ -1364,7 +1363,7 @@ body.adm-mode .adm-step-row    { display: flex; }
     display:            inline;
 }
 
-/* FIT FOV / FILL FOV side by side (issue #230). Was .fit-fill-stack
+/* FIT FOV / FILL FOV side by side. Was .fit-fill-stack
  * (vertical); flattened to a row to free the space underneath for the
  * Sweep controls without growing the group box. align-items flex-end
  * bottom-aligns the buttons with the neighbouring labelled inputs,
@@ -1376,10 +1375,9 @@ body.adm-mode .adm-step-row    { display: flex; }
     align-items:        flex-end;
 }
 
-/* Sweep control row (issue #230). Sits directly under the Ref Z /
+/* Sweep control row. Sits directly under the Ref Z /
  * World Scale / FIT-FILL row inside the same group box. Deliberately
- * tighter than .spaced (10px) - the two rows are one logical cluster,
- * and the issue asks for the section not to get taller than needed. */
+ * tighter than .spaced (10px) */
 .sweep-row {
     margin-top:         4px;
 }
@@ -1436,7 +1434,7 @@ body.adm-mode .adm-step-row    { display: flex; }
     margin:             0;
 }
 
-/* Live-preview toggle under Execute Sequence (issue #205). A small inline
+/* Live-preview toggle under Execute Sequence. A small inline
  * checkbox+label row centred under the full-width Execute button. It lives in
  * .probe-controls, not .const-group, so it gets its own layout rather than
  * reusing .par-preview-toggle (which is tuned to override Hardware-Constants
@@ -1912,7 +1910,7 @@ body.adm-mode .adm-step-row    { display: flex; }
 }
 
 /* --- DRE Sheet grid template ---
- * Issue #169: Dynamic Range Extender mode.
+ * Dynamic Range Extender mode.
  * DRE sheets are deliberately simpler than SSS/MDS - no JK printer 
  * columns, no spatial transforms, no eye-toggle visibility hooks. 
  * Just identity, frame number, interpolation mode, exposure, DRE 
@@ -2027,7 +2025,7 @@ hr.section-divider {
     grid-column:        span 2;                    /* Forces this cell to span across two columns to fit the contents */
 }
 
-/* TARGET AR helper row (issue #199)
+/* TARGET AR helper row
  * .constants-zone is a 4-column grid (repeat(4, 1fr)) and .crush-group
  * spans 2 columns. With no override, the PAR row (a .crush-group, span 2)
  * and this Target AR row (also a .crush-group, span 2) pack onto the SAME
@@ -2213,7 +2211,7 @@ body.brk-mode .brk-probe-controls {
  * Below the breakpoint we zero the two gutter tokens. Because every
  * frame measurement derives from them — the page padding, the
  * cheat-sheet inset, and --wood-frame-total (which feeds .sheets-area's
- * width) — the whole layout snaps back to its pre-makeover full width
+ * width) — the whole layout snaps back to its pre-woodgrain texture full width
  * with no other rules touched. We then hide the cheeks, since a
  * zero-width cheek would still leave its 1px border + shadow behind.
  *

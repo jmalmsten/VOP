@@ -1,4 +1,4 @@
-# v26.2.5
+# v26.2.6
 
 ## Notes: 
 The second release since the big move to GitHub. 
@@ -47,3 +47,9 @@ Turned out the implementation of the screen timeout was a bit naive. So I have d
 To make the webGUI more usable on narrow viewports like phones. I had to add in a little css to rearrange the buttons for the mags. Shouldn't change layout on the desktop view in full HD screens. 
 
 fit_z also was still not fixed. Went ahead and did that. 
+
+### Patch 6: General comment cleanup
+As the repo has moved from codeberg to github. And issue numbers don't match. I have elected to try to clean out all the issue numbers that are referenced in the codebase comments. I have also tried to remove other cryptic references that can't be deduced with information that is in the codebase itself or a wiki page. All to make it less confusing for people outside my head to navigate the codebase. 
+
+### Patch 6: removed instructions.md
+Since alignment and focus is done in the webGUI that file was now deemed redundant.

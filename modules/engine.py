@@ -63,7 +63,7 @@ os.environ["SDL_VIDEODRIVER"] = "kmsdrm"
 # The IPC command file written by vop.py
 COMMAND_FILE = "/tmp/vop_cmd.json"
 
-# Sentinel polled by the idle loop (issue #198). While this file exists,
+# Sentinel polled by the idle loop. While this file exists,
 # the projection monitor shows the framing/focus targets instead of the
 # bouncing logo. Same /tmp on-disk-IPC paradigm as COMMAND_FILE. vop.py
 # defines the identical path on its side - keep the two in sync.
@@ -278,7 +278,7 @@ def run_persistent_engine():
     
     ctx, prog, vao = gfx.init_render_pipeline()
 
-    # Calibration framing/focus targets (issue #198): its own program +
+    # Calibration framing/focus targets: its own program +
     # fullscreen quad, drawn in the idle branch while CAL_TARGETS_FILE
     # exists. Separate from prog/vao so it can't disturb the main pipeline.
     cal_prog, cal_vao = gfx.init_calibration_targets(ctx)
@@ -390,7 +390,7 @@ def run_persistent_engine():
             bp2_scale = float(job_data.get('bipack2_coord_scale', 1.0))
 
             # ---------------------------------------------------------
-            # SWEEP (issue #230) PER-LAYER CONFIG
+            # SWEEP PER-LAYER CONFIG
             # Read once per task, like the world scales above, so the
             # per-frame render loop never touches job_data for these.
             #
@@ -536,7 +536,7 @@ def run_persistent_engine():
                     if 'slice_high' in prog:
                         prog['slice_high'].value = 1.0
 
-                # SWEEP (issue #230) UNIFORM SETUP
+                # SWEEP UNIFORM SETUP
                 #
                 # sweep_pos is shared by all three layer passes in this
                 # render - it's the smear clock, and there is exactly
@@ -687,7 +687,7 @@ def run_persistent_engine():
                         rot_order=rot_order)
                     prog['mvp'].write(mvp)
                     prog['filter_color'].write(np.array([1.0, 1.0, 1.0], dtype='f4'))
-                    # SWEEP (issue #230): this layer's luma-window
+                    # SWEEP: this layer's luma-window
                     # filter. Bypass tuple when the layer's dropdown
                     # says so, when the mode gate (DRE/BRK) zeroed the
                     # config at task setup, or via SWEEP_OFF resets.
@@ -719,7 +719,7 @@ def run_persistent_engine():
                 prog['mvp'].write(mvp_mag)
                 prog['filter_color'].write(st['pg'].astype('f4'))
 
-                # SWEEP (issue #230): PM layer's filter. Note this runs
+                # SWEEP: PM layer's filter. Note this runs
                 # even when tex_mag is the white pass-through (closed
                 # eye) - the PM pass, unlike the bipack FBO path, still
                 # draws a quad in that case. A sweep on an all-white
@@ -742,7 +742,7 @@ def run_persistent_engine():
                 prog['mvp'].write(np.eye(4, dtype='f4').tobytes())
                 prog['filter_color'].write(np.array([1.0, 1.0, 1.0], dtype='f4'))
 
-                # SWEEP (issue #230): MUST be Bypass here. These two
+                # SWEEP: MUST be Bypass here. These two
                 # draws composite the already-rendered bipack FBOs
                 # over the screen; a live sweep would re-filter the
                 # filtered result (and mangle non-swept layers too).
@@ -764,7 +764,7 @@ def run_persistent_engine():
                 # is_comp_preview takes precedence over is_preview when both are True
                 # (defensive - the caller should only set one).
                 #
-                # Mode dispatch for issue #169. DRE jobs run through a 
+                # Mode dispatch. DRE jobs run through a 
                 # completely separate exposure path because the inner 
                 # loop is fundamentally different (pre-generated DRE 
                 # step sequence vs. time-normalized motion smear). 
@@ -930,7 +930,7 @@ def run_persistent_engine():
 
             def execute_dre_exposure(frame_num, is_preview=False, is_comp_preview=False):
                 """
-                DRE / Dynamic Range Extender exposure path (issue #169).
+                DRE / Dynamic Range Extender exposure path.
                 
                 Sibling to execute_exposure(). Same camera trigger semantics 
                 (single libcamera exposure with pre-roll), but the HDMI animation 
@@ -1135,9 +1135,7 @@ def run_persistent_engine():
                     # the refresh interval. For a 5s/256-step job, target 
                     # 19.5ms rounds to 1 flip = 16.7ms, so the actual 
                     # exposure runs slightly short of requested EXP. This 
-                    # is the price of vsync alignment - the calibration LUT 
-                    # phase (issue #184) will sharpen the relationship 
-                    # between user-requested EXP and integrated photons.
+                    # is the price of vsync alignment.
                     flips_per_step = max(1, int(round(ms_per_step / PANEL_REFRESH_MS)))
                     
                     # Upload this step as a fresh 8-bit RGB texture. We use the 
@@ -1324,7 +1322,7 @@ def run_persistent_engine():
 
             def execute_brk_exposure(frame_num, is_preview=False, is_comp_preview=False):
                 """
-                BRK / Bracketed-exposure path (issue: BRK mode).
+                BRK / Bracketed-exposure path.
 
                 Sibling of execute_exposure and execute_dre_exposure.
                 Unlike SSS/MDS (one camera capture per frame, motion
@@ -1424,10 +1422,7 @@ def run_persistent_engine():
                 brk_seq.warn_if_extreme(brackets, log_fn=log_audit)
 
                 # ---------- Per-frame BRK state ----------
-                # get_brk_state currently returns just gels. POS/ROT
-                # and JK printer per-keyframe overrides land in
-                # slice 13; for slice 12b we use straight playheads
-                # (frame_num as PM playhead) and identity transforms.
+                # get_brk_state currently returns just gels. 
                 brk_state = timeline.get_brk_state(frame_num)
                 pg_color = brk_state['pg']
                 cg_color = brk_state['cg']
@@ -1821,12 +1816,12 @@ def run_persistent_engine():
                     img_data = cv2.flip(img_data, 0)
                     img_data = cv2.cvtColor(img_data, cv2.COLOR_RGBA2BGR)
 
-                    # Step 3: JPG-level unsqueeze. Forwards the same PAR and
+                    # JPG-level unsqueeze. Forwards the same PAR and
                     # toggle values that were used to render. With
                     # preview_unsqueeze off this is a no-op pass-through.
                     img_data = cutil.unsqueeze_preview_jpg(img_data, par_x, par_y, preview_unsqueeze)
 
-                    # Step 4: letterbox into a Cam-View-shaped canvas.
+                    # Letterbox into a Cam-View-shaped canvas.
                     # Compute target dims from cam_res and PAR using the
                     # same formula generate_sensor_preview applies when it
                     # builds Cam View's output. Defaults to '2028x1520' to
@@ -1859,7 +1854,7 @@ def run_persistent_engine():
                         except Exception as e:
                             log_audit(f"Proj Probe target-shape calc failed: {e}")
 
-                    # Step 5: bake an explicit "inside camera, outside panel"
+                    # Bake an explicit "inside camera, outside panel"
                     # indicator band into the JPG itself. The default fill
                     # (26,26,26) matches --bg-panel in style.css, which used
                     # to be desirable - the JPG letterbox visually merged
@@ -1978,7 +1973,7 @@ def run_persistent_engine():
                     # shutter by 1.5s. Since sensor dark current grows
                     # roughly linearly with integration time, that made the
                     # reported noise floor correspond to a longer-than-
-                    # claimed exposure - i.e. overstated. (issue #187)
+                    # claimed exposure - i.e. overstated.
                     cam_proc = hw.trigger_capture(buf_f, total_ms, job_data.get('gain', 1.0),
                                                   job_data.get('awb_r', 1.0), job_data.get('awb_b', 1.0),
                                                   job_data.get('cam_res', '2028x1520'))
@@ -2028,7 +2023,7 @@ def run_persistent_engine():
                     # shutter argument, with the sensor prime handled
                     # separately by trigger_capture's `-t` flag and the
                     # wait_for_sensor_prime() call below. Do NOT add
-                    # PRIME_WAIT_MS to the shutter (see issue #187).
+                    # PRIME_WAIT_MS to the shutter.
                     buf_f = "/tmp/vop_peak_buf.dng"
                     cam_proc = hw.trigger_capture(
                         buf_f,
@@ -2078,8 +2073,7 @@ def run_persistent_engine():
                     #      double exposure. If > target_high: too
                     #      bright, halve. Repeat until we bracket
                     #      (one undershoot AND one overshoot seen).
-                    #      This is the "doubling-bootstrap" phase -
-                    #      it converges fast even when the initial
+                    #      It converges fast even when the initial
                     #      guess is wildly off.
                     #   3. Once bracketed, switch to bisection: try
                     #      the midpoint of the bracket, replace
@@ -2368,7 +2362,7 @@ def run_persistent_engine():
                     # info in the audit log - lets the user see if
                     # one channel has a noticeably hotter dark current
                     # than the others, which is a useful diagnostic
-                    # for sensor warmup or stray-light issues.
+                    # for sensor warmup or stray-light.
                     m = cutil.measure_centre_brightness(
                         buf_f, static_dir, return_dict=True
                     )
@@ -2507,7 +2501,7 @@ def run_persistent_engine():
                         return {'channel_maxes': (rs / n, gs / n, bs / n),
                                 'per_channel_max': pcm}
                     
-                    # --- PHASE 1: exposure search (ACB-shaped bisection. run
+                    # --- 1: exposure search (ACB-shaped bisection. run
                     # at the starting gains so all channels have signal).---
                     low_bound = high_bound = None
                     current_exposure = initial_exposure
@@ -2599,7 +2593,7 @@ def run_persistent_engine():
                         awb_r = min(max(awb_r * fr, 0.25), 16.0)
                         awb_b = min(max(awb_b * fb, 0.25), 16.0)
 
-                    # --- Phase 3: confirm. Capture grey at the FINAL gains and
+                    # --- 3: confirm. Capture grey at the FINAL gains and
                     # report how neutral it actually came out. This is the real
                     # accountant's truth: not a predicted residual, but what the
                     # camera genuinely produces at the gains we're about to 
@@ -2669,7 +2663,7 @@ def run_persistent_engine():
                     # pixels that only misbehave at exposures we never
                     # actually shoot. Matching the real integration time
                     # maps the pixels that are genuinely hot at the
-                    # exposures our jobs use. (sibling of issue #187)
+                    # exposures our jobs use.
                     cam_proc = hw.trigger_capture(buf_f, total_ms, job_data.get('gain', 1.0),
                                                   job_data.get('awb_r', 1.0), job_data.get('awb_b', 1.0),
                                                   job_data.get('cam_res', '2028x1520'))
@@ -2885,7 +2879,7 @@ def run_persistent_engine():
                                 total_size_bytes += os.path.getsize(out_f)
                                 files_found += 1
 
-                                # LIVE PREVIEW (issue #205) - opt-in. When the
+                                # LIVE PREVIEW - opt-in. When the
                                 # "Live preview" checkbox by Execute Sequence is
                                 # ticked, refresh the GUI preview with the frame
                                 # that just committed. OFF by default because the
@@ -2918,7 +2912,7 @@ def run_persistent_engine():
                         ts = int(time.time())
                         out_mp4 = os.path.join(wp_dir, f"vop_wp_{ts}.mp4")
 
-                        # PAR / UNSQUEEZE - issue #201. The auto end-of-job
+                        # PAR / UNSQUEEZE. The auto end-of-job
                         # workprint had NO unsqueeze handling at all (out_mp4 was
                         # appended straight after -pix_fmt), so it always ignored
                         # PAR. The manual RENDER WORKPRINT route (vop.py
@@ -3061,12 +3055,11 @@ def run_persistent_engine():
             #
             # Bind the default framebuffer first (a prior task may have left
             # a BiPack FBO bound) and clear to opaque black so each idle
-            # frame starts clean. Slice 2's alignment targets render in this
-            # same branch and rely on this clear too.
+            # frame starts clean. 
             ctx.screen.use()
             ctx.clear(0.0, 0.0, 0.0, 1.0)
 
-            # --- CALIBRATION TARGETS MODE (issue #198) ---
+            # --- CALIBRATION TARGETS MODE ---
             # While the framing tool is active, vop.py drops CAL_TARGETS_FILE.
             # As long as it exists we draw the alignment/focus targets instead
             # of the bouncing logo, so the operator - watching the live feed -

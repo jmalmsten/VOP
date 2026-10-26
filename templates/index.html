@@ -31,7 +31,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>VOP v26.1</title>
+    <title>VOP v26.2</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=57">
 </head>
 <body>
@@ -39,7 +39,7 @@
         
         <div class="vop-header">
             <!-- Page title -->
-            <h2>VOP v26.2.5</h2>
+            <h2>VOP v26.2.6</h2>
 
             <!-- Page navigation. Click to switch between Main
                  (job editor + status + xsheet) and Calibration
@@ -159,7 +159,7 @@
                     <div class="input-row spaced">
                         <div class="c-box"><label>Ref Z (Fit)</label><input type="number" step="0.1" id="fit_z" value="-1.0"></div>
                         <div class="c-box"><label>World Scale</label><input type="number" step="0.0001" id="coord_scale" value="1.0"></div>
-                        <!-- FIT/FILL side-by-side (issue #230): frees the row
+                        <!-- FIT/FILL side-by-side: frees the row
                              below for the Sweep controls without making the
                              group box taller. -->
                         <div class="c-box fit-fill-row">
@@ -167,7 +167,7 @@
                             <button class="mini-btn" onclick="calcFitScale('coord_scale', 'fit_z', 'proj', 'fill')" title="Scale image to fill the entire projection frustum (overflow on shorter axis)">FILL FOV</button>
                         </div>
                     </div>
-                    <!-- SWEEP (issue #230). Luma-window filter that rides the
+                    <!-- SWEEP. Luma-window filter that rides the
                          smear clock: during an SSS/MDS exposure the window
                          travels from below black to above white, showing each
                          pixel as pure white only while its value is inside
@@ -205,7 +205,7 @@
                     <div class="input-row spaced">
                         <div class="c-box"><label>Ref Z (Fit)</label><input type="number" step="0.1" id="bipack1_fit_z" value="-1.0"></div>
                         <div class="c-box"><label>World Scale</label><input type="number" step="0.0001" id="bipack1_coord_scale" value="1.0"></div>
-                        <!-- FIT/FILL side-by-side (issue #230): frees the row
+                        <!-- FIT/FILL side-by-side: frees the row
                              below for the Sweep controls without making the
                              group box taller. -->
                         <div class="c-box fit-fill-row">
@@ -213,7 +213,7 @@
                             <button class="mini-btn" onclick="calcFitScale('bipack1_coord_scale', 'bipack1_fit_z', 'bipack1', 'fill')" title="Scale image to fill the entire projection frustum (overflow on shorter axis)">FILL FOV</button>
                         </div>
                     </div>
-                    <!-- SWEEP (issue #230). Luma-window filter that rides the
+                    <!-- SWEEP. Luma-window filter that rides the
                          smear clock: during an SSS/MDS exposure the window
                          travels from below black to above white, showing each
                          pixel as pure white only while its value is inside
@@ -251,7 +251,7 @@
                     <div class="input-row spaced">
                         <div class="c-box"><label>Ref Z (Fit)</label><input type="number" step="0.1" id="bipack2_fit_z" value="-1.0"></div>
                         <div class="c-box"><label>World Scale</label><input type="number" step="0.0001" id="bipack2_coord_scale" value="1.0"></div>
-                        <!-- FIT/FILL side-by-side (issue #230): frees the row
+                        <!-- FIT/FILL side-by-side: frees the row
                              below for the Sweep controls without making the
                              group box taller. -->
                         <div class="c-box fit-fill-row">
@@ -259,7 +259,7 @@
                             <button class="mini-btn" onclick="calcFitScale('bipack2_coord_scale', 'bipack2_fit_z', 'bipack2', 'fill')" title="Scale image to fill the entire projection frustum (overflow on shorter axis)">FILL FOV</button>
                         </div>
                     </div>
-                    <!-- SWEEP (issue #230). Luma-window filter that rides the
+                    <!-- SWEEP. Luma-window filter that rides the
                          smear clock: during an SSS/MDS exposure the window
                          travels from below black to above white, showing each
                          pixel as pure white only while its value is inside
@@ -281,7 +281,7 @@
                 </div>
             </div>
 
-            <!-- issue #185: preview + waveform scope live side by side in
+            <!-- Preview + waveform scope live side by side in
                  grid-column 1. The wrapper holds the column slot now; the
                  preview itself is unchanged inside it. -->
             <div class="preview-row">
@@ -289,7 +289,7 @@
                     <button type="button" class="mini-btn fullscreen-btn" onclick="toggleFullscreen(this.closest('.preview-area'))" title="Toggle Full Screen">&#9974;</button> <!-- when using on other elements. Make sure to update toggleFull() to point to the correct DIV -->
                     <img id="probe_img" alt="Live Preview">
                 </div>
-                <!-- Waveform scopes (issue #185). Two stacked canvases:
+                <!-- Waveform scopes. Two stacked canvases:
                      top = luma, bottom = RGB overlay. Canvas only - all
                      sizing in style.css; main.js sets the backing-store res. -->
                 <div class="waveform-area">
@@ -364,7 +364,7 @@
                                 EXPOSE FRAME    - shoot the frame in the gate now, leave playhead put.
                                 EXPOSE + ADVANCE- shoot it, then step forward one frame and re-light.
                             Click handlers are wired together with the single-frame exposure engine
-                            route; until then they are inert no-ops (log only), safe to click. -->
+                            route -->
                         <button class="action-btn execute adm-control" onclick="admExposeFrame()"
                                 title="Expose the current gate frame and commit it to the Cam Mag. Once exposed it's exposed - there is no undo.">EXPOSE FRAME</button>
                         <button class="action-btn execute adm-control" onclick="admExposeAdvance()"
@@ -380,9 +380,7 @@
                                 ›  forward one frame        ( . )
                                 »  next keyframe            (Shift + .)
                             "Keyframe" = a frame that has a row in the CURRENT mode's exposure sheet.
-                            C's screen-clear rides in with the projection-hold engine route; until
-                            then its handler is an inert no-op. Glyphs are «/‹/›/» - swap for literal
-                            "<<"/"<" etc. if you'd rather. -->
+                            C's screen-clear rides in with the projection-hold engine route. Glyphs are «/‹/›/» -->
                         <div class="adm-step-row">
                             <button class="action-btn" onclick="stepKeyframe(-1)" title="Previous keyframe (Shift + ,)">&laquo;</button>
                             <button class="action-btn" onclick="stepFrame(-1)"    title="Step back one frame ( , )">&lsaquo;</button>
@@ -418,7 +416,7 @@
                     <div class="constants-zone">
                         <div class="const-group"><label>FOV</label><input id="fov" type="number" value="45"></div>
                         <div class="const-group"><label>Cam Res</label><select id="cam_res">
-                            <!-- Native IMX477 (HQ camera) sensor modes only - issue #208.
+                            <!-- Native IMX477 (HQ camera) sensor modes only.
                                  Was a free text input, which let non-native sizes through;
                                  libcamera then silently snapped them to the nearest real
                                  mode (the confusing behaviour this fixes). Option VALUES
@@ -479,7 +477,7 @@
                             </label>
                         </div>
 
-                        <!-- TARGET AR -> PAR helper (issue #199)
+                        <!-- TARGET AR -> PAR helper
                              A convenience calculator for anamorphic setups.
                              You type the FINAL aspect ratio you want the
                              projected image to read as (e.g. 2.2 : 1) and hit

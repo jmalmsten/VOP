@@ -75,7 +75,7 @@ class Timeline:
             # 'crn' = per-keyframe corner override (bool). When True, the
             #         spline tangent at this keyframe is forced to zero on
             #         both sides, producing a hard settle-and-pivot (sharp V)
-            #         instead of a rounded pass-through (smooth U). (issue #155)
+            #         instead of a rounded pass-through (smooth U).
             'm': [], 'crn': [], 'pos': [], 'rot': [],
             # Per-bipack-layer spatial tracks. bp1_* replaces the old single-bipack 
             # 'bp_*' set; bp2_* is added for the new third optical layer.
@@ -100,7 +100,7 @@ class Timeline:
         elif self.mode == 'sss':
             prefix = "sss_"
         elif self.mode == 'dre':
-            # DRE mode (Dynamic Range Extender, issue #169). The exposure
+            # DRE mode (Dynamic Range Extender). The exposure
             # sheet schema is intentionally minimal: frame number, exposure
             # time, DRE step count, and per-keyframe projector/camera gels.
             # No spatial transforms, no smear start/stop, no JK printer
@@ -252,7 +252,7 @@ class Timeline:
             # Extract Interpolation Mode (S = Smooth, L = Linear)
             self.tracks['m'].append({'f': f_val, 'val': job_data.get(f"{prefix}m{idx}", "S")})
 
-            # Corner override (issue #155). The frontend sends this as a
+            # Corner override. The frontend sends this as a
             # boolean checkbox under {prefix}crn{idx}. We test membership
             # rather than calling bool() directly because bool("false") is
             # True in Python - a non-empty string is always truthy - which
@@ -348,7 +348,7 @@ class Timeline:
         """True if the keyframe at frame f_val carries the corner override.
         Looked up by FRAME VALUE, not list index, so we never depend on the
         'crn' track being index-aligned with the value tracks - the final
-        per-track sort in __init__ can reorder them independently. (issue #155)"""
+        per-track sort in __init__ can reorder them independently."""
         for kf in self.tracks.get('crn', []):
             if kf['f'] == f_val:
                 return bool(kf['val'])
@@ -540,12 +540,6 @@ class Timeline:
         # Keyframe-level gel: the MDS master-row PG. get_state() (called as
         # st_base above) already sampled the 'pg' track into st_base['pg'],
         # defaulting to white [1,1,1] when unset.
-        #
-        # Issue #200: this value was being computed and then THROWN AWAY - the
-        # old code returned a pg built solely from the smear start/stop colours,
-        # so the master-row PG never reached the exposure. Because it defaults
-        # to white, a keyframe with no PG set is a transparent no-op pass, which
-        # is the "default to white like the others" behaviour the issue asks for.
         pg_keyframe = st_base['pg']
 
         # Stack the two gels. Two gels in the optical path are transmission
@@ -583,8 +577,6 @@ class Timeline:
         No position, rotation, scale, smear start/stop, or JK printer 
         columns - the frame is held stationary while luminance is 
         animated by engine.py's execute_dre_exposure path.
-        
-        Phase 3 of issue #169.
         """
         # No keyframes at all -> sane defaults so the engine can at 
         # least try to render. Matches the behavior of get_state's 

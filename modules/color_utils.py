@@ -99,7 +99,7 @@ def write_live_preview_from_latent(latent_path, static_dir,
     """
     Read a committed CamMag latent TIFF and write it to static/probe_live.jpg
     as an 8-bit, optionally-unsqueezed preview. Powers the Execute loop's
-    opt-in "Live preview" feature (issue #205): refresh the GUI preview window
+    opt-in "Live preview" feature: refresh the GUI preview window
     after each frame's exposure commits.
 
     The latent on disk is ALREADY the final composited + CG-gelled image, so
@@ -261,7 +261,7 @@ def generate_comp_preview(buffer_file, static_dir, cam_mag_dir, frame_num,
                           cam_gel_rgb, mono_forced, black_clip=0.0,
                           par_x=1.0, par_y=1.0, preview_unsqueeze=False):
     """
-    COMP PREVIEW (issue #175)
+    COMP PREVIEW
     Hybrid of generate_sensor_preview and process_and_stack_latent_image:
     process the freshly captured DNG identically to a real exposure (16-bit
     workspace, hot pixels, pedestal, mono, CG gel) AND additively composite

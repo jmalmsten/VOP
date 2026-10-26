@@ -6,7 +6,7 @@ Description:    Dynamic Range Extender frame sequencer
                 output (across a camera exposure window) reconstructs the
                 full 16-bit tonal range on an 8-bit projection monitor.
 
-                Per-pixel temporal scheduling (see VOP issue #169):
+                Per-pixel temporal scheduling:
                 each step in the sequence raises a luminance threshold;
                 pixels with source values above the threshold contribute
                 light for that step, pixels below it go black. Higher-
@@ -51,8 +51,7 @@ DEFAULT_STEPS = 256
 
 # Placeholder dumb-gamma. The screen is not linear in code value vs. emitted
 # photons; a value of 128 emits noticeably less than half the light of 
-# 255 on a typical 8-bit panel. A real per-screen calibration LUT (issue
-# #184) will replace this number eventually. Until then, a single
+# 255 on a typical 8-bit panel. A real per-screen calibration LUT will replace this number eventually. Until then, a single
 # global gamma constant lets us twist one knob and re-test rather than
 # rebuilding the pipeline. 2.2 is the rec.709-ish default; the actual
 # panel will probably want something different once measured.
@@ -80,7 +79,7 @@ def sequence_frame(source_16bpc, steps=DEFAULT_STEPS, gamma=DEFAULT_GAMMA):
                        code value vs. emitted photons; raising thresholds
                        to gamma 2.2 approximates a perceptually-linear
                        photon ramp. Replace with a measured LUT in a
-                       future phase (issue #184).
+                       future update.
 
     Yields:
         numpy.ndarray, dtype=uint8, shape=(H, W, 3).
@@ -158,10 +157,10 @@ def sequence_frame(source_16bpc, steps=DEFAULT_STEPS, gamma=DEFAULT_GAMMA):
     # distinct values. The smooth-gradient capture you wanted came out 
     # as flat color bands because of this.
     # 
-    # No screen-response gamma is applied here. The intent of phase 3 is 
+    # No screen-response gamma is applied here. The intent is 
     # to produce linear-photon output; the screen's actual response curve 
-    # is a calibration concern handled by the LUT mapper in phase 4 
-    # (issue #184). Mixing them at the encoding stage made the math 
+    # is a calibration concern handled by the LUT mapper in a later stage.
+    # Mixing them at the encoding stage made the math 
     # non-monotonic and the captured images unrecoverable.
     for s in range(steps):
         # Per-pixel "remaining fuel after step s", clipped to [0, 1].
