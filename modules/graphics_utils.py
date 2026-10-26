@@ -33,7 +33,8 @@ import moderngl
 import numpy as np
 import os
 import cv2
-import collections # Required for OrderedDict access tracking
+import collections      # Required for OrderedDict access tracking
+import media_formats    # Shared STILL_IMAGE_EXTS list (also used by vop.py)
 
 def init_render_pipeline():
     vert = """
@@ -391,6 +392,10 @@ class TextureManager:
         # across multiple held frames without triggering premature eviction.
         self.max_capacity = max_capacity
 
+        # Paths we've already logged a decode failure for, so a broken file
+        # produces ONE warning instead of one per rendered frame.
+        self._warned_paths = set()
+
         # 1x1 pure-white texture used as a pass-through stand-in whenever a 
         # layer is hidden (eye-toggle off) or has no source frames on disk. 
         # White is multiplicatively identity in the blend pipeline, so swapping
@@ -399,7 +404,7 @@ class TextureManager:
         white = np.ones((1,1,3), dtype='uint8') * 255
         self.white_tex = ctx.texture((1,1), 3, white.tobytes())
 
-        valid_exts = ('.png', '.jpg', '.tif', '.tiff')
+        valid_exts = media_formats.STILL_IMAGE_EXTS
         base_path = os.path.dirname(proj_dir)  # parent of ProjMag = repo BASE_DIR
 
         # Scan every layer's folder once at job-start. Files are stored sorted
@@ -415,6 +420,14 @@ class TextureManager:
                     os.path.join(folder_path, f) for f in os.listdir(folder_path)
                     if f.lower().endswith(valid_exts)
                 ])
+                # DIAGNOSTIC: the upload route accepts any filename, so a file
+                # can land in the folder that we then silently skip. Say so.
+                skipped = [f for f in os.listdir(folder_path)
+                           if not f.lower().endswith(valid_exts)]
+                if skipped:
+                    print(f"[VOP WARNING] TextureManager: {folder_name} contains "
+                          f"file(s) with an unsupported extension, ignoring: {skipped}")
+
             else:
                 self.layer_files[layer_key] = []
 
@@ -480,7 +493,14 @@ class TextureManager:
         # would auto-strip alpha AND silently downcast 16-bit TIFFs to 
         # uint8
         img = cv2.imread(f_path, cv2.IMREAD_UNCHANGED)
-        if img is None: 
+        if img is None:
+            # imread returns None for unreadable / unsupported files. We
+            # still fall back to white (behaviour unchanged), but say why,
+            # once per file.
+            if f_path not in self._warned_paths:
+                self._warned_paths.add(f_path)
+                print(f"[VOP WARNING] TextureManager: OpenCV could not decode "
+                      f"{f_path}; showing white pass-through instead.")
             return self.white_tex, 1.777
 
         # ----- Alpha premultiply (dtype-aware) ----------------------------

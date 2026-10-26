@@ -44,6 +44,8 @@ import threading
 import signal
 import numpy as np  # for 16-bit → 8-bit reduction in /cam_probe
 from flask import Flask, jsonify, request, render_template, send_from_directory, send_file, Response
+import media_formats # shared STILL_IMAGE_EXTS list (also used by graphics_utils.py)
+
 
 # Append the modules directory to the system path for local imports
 sys.path.append(os.path.join(os.path.dirname(__file__), "modules"))
@@ -588,7 +590,7 @@ def count_source_frames(directory):
     """
     if not os.path.exists(directory):
         return 0
-    valid_exts = ('.png', '.jpg', '.jpeg', '.tif', '.tiff')
+    valid_exts = media_formats.STILL_IMAGE_EXTS
     return len([f for f in os.listdir(directory) if f.lower().endswith(valid_exts)])
 
 
@@ -1385,7 +1387,7 @@ def get_img_aspect():
     else:
         check_dir = PROJ_MAG_DIR
     try:
-        valid_exts = ('.png', '.jpg', '.jpeg', '.tif', '.tiff')
+        valid_exts = media_formats.STILL_IMAGE_EXTS
         files = sorted([f for f in os.listdir(check_dir) if f.lower().endswith(valid_exts)])
         
         if files:

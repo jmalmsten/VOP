@@ -22,6 +22,9 @@ To save on the screens lifetime and processing cycles. A screen timeout has been
 ### Patch 3: webGUI now has a suspended state.
 When screen goes into timeout, there's now a third state, color coded yellow, to show that the screen output has been suspended. 
 
+### Patch 10: Adding a bunch of image formats for input.
+Adding .jpeg (jpg was available before this patch), .webp, .bmp, .pbm, pgm, ppm, .jp2 and .avif to the list of image formats that can be used as images for extrusions and smears. 
+
 ## Changed:
 
 ### Patch 1: Fixing layout
@@ -62,3 +65,6 @@ Since alignment and focus is done in the webGUI that file was now deemed redunda
 
 ### Patch 7: Fixed unused admClear()
 During cleanup in Patch 6 I found that admClear() was not actually used anywhere and the button that should call it was not used either. Should be fixed now. 
+
+### Patch 10: Jpeg not identified
+Found that while jpg is loaded as expected. jpeg however was not loaded and the VOP behaved like the mag was empty by showing just a white image. This has been remedied by simply adding "jpeg" to the list of acceptable image formats. Not sure why this wasn't done before today. 
