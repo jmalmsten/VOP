@@ -246,16 +246,7 @@ No JS event handlers here.
                     title="Find camera WB gains from a neutral grey, then confirm Persists awb_r / awb_b and writes them to the main page.">AUTO WHITE BALANCE</button>
         </div>
         <hr class="section-divider">
-        <!--
-            Defect Mapping: MAP PIXELS builds a hot-pixel map from a dark frame;
-                            NUKE MAP clears it.
-        -->
-        <div class="const-group crush-group">
-            <label>Defect Mapping</label>
-            <button class="mini-btn" onclick="triggerHotPixelMap()">MAP PIXELS</button>
-            <button class="mini-btn danger" onclick="nukeHotPixels()">NUKE MAP</button>
-            <span id="hp_result_txt"></span>
-        </div>
+        
 
         <!-- Result readout. These are the camera gains the loop converged on,
              plus the confirmed residual (the accountant's truth check).
@@ -269,6 +260,17 @@ No JS event handlers here.
 
             <div class="cal-readout-label">Accountant's truth:</div>
             <div class="cal-readout-value" id="cal_wb_readout_pass">--</div>
+        </div>
+
+        <!--
+            Defect Mapping: MAP PIXELS builds a hot-pixel map from a dark frame;
+                            NUKE MAP clears it.
+        -->
+        <div class="const-group crush-group">
+            <label>Defect Mapping</label>
+            <button class="mini-btn" onclick="triggerHotPixelMap()">MAP PIXELS</button>
+            <button class="mini-btn danger" onclick="nukeHotPixels()">NUKE MAP</button>
+            <span id="hp_result_txt"></span>
         </div>
     </div>
 </div>
