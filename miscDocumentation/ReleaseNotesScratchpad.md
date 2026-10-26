@@ -1,4 +1,4 @@
-# v26.2.8
+# v26.2.9
 
 ## Notes: 
 The second release since the big move to GitHub. 
@@ -32,6 +32,9 @@ I realized that if it's hard for me to remember that the `ADM` button is not a p
 
 ### Patch 8: Moving Defect Mapping buttons
 Moved the Defect Mapping buttons so it's underneath the rest of the white balance bits. 
+
+### Patch 9: Moved Peak White to the bottom
+As this is not a feature often used (or at all at the moment when bracketing isn't really working). I to moved this whole section to the bottom of the calibration page. 
 
 ## Fixed:
 
