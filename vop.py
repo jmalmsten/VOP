@@ -42,7 +42,7 @@ import socket
 import time
 import threading
 import signal
-import media_formats # shared STILL_IMAGE_EXTS list (also used by graphics_utils.py)
+
 import numpy as np  # for 16-bit → 8-bit reduction in /cam_probe
 from flask import Flask, jsonify, request, render_template, send_from_directory, send_file, Response
 
@@ -61,6 +61,9 @@ import interpolator  # for resolving per-gate JK playheads in /status and /cam_p
 # Owns its own rpicam-vid process; see the single-owner camera note in
 # dispatch_engine where we stop it before any capture.
 import camera_feed
+
+# shared STILL_IMAGE_EXTS list (also used by graphics_utils.py)
+import media_formats 
 
 # Suppress default Flask HTTP request logging to keep the terminal output clean for audit logs
 log = logging.getLogger('werkzeug')
