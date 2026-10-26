@@ -54,7 +54,7 @@ PRIME_WAIT_MS = 1500
 # PRIME_WAIT_MS to this argument or you will get an exposure that is
 # 1.5 seconds longer than intended.
 #
-# Historical note (issue #187): two callers - measure_noise and
+# Historical note: two callers - measure_noise and
 # map_hot_pixels - used to add PRIME_WAIT_MS to this argument,
 # stretching their dark frames by 1.5s. measure_noise's noise floor
 # was therefore measured at a longer-than-claimed integration time

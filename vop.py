@@ -42,8 +42,11 @@ import socket
 import time
 import threading
 import signal
+
 import numpy as np  # for 16-bit → 8-bit reduction in /cam_probe
 from flask import Flask, jsonify, request, render_template, send_from_directory, send_file, Response
+
+
 
 # Append the modules directory to the system path for local imports
 sys.path.append(os.path.join(os.path.dirname(__file__), "modules"))
@@ -54,10 +57,13 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "modules"))
 import calibration_store as cstore
 import interpolator  # for resolving per-gate JK playheads in /status and /cam_probe
 
-# Live MJPEG framing/focus feed for the Calibration page (issue #198).
+# Live MJPEG framing/focus feed for the Calibration page.
 # Owns its own rpicam-vid process; see the single-owner camera note in
 # dispatch_engine where we stop it before any capture.
 import camera_feed
+
+# shared STILL_IMAGE_EXTS list (also used by graphics_utils.py)
+import media_formats 
 
 # Suppress default Flask HTTP request logging to keep the terminal output clean for audit logs
 log = logging.getLogger('werkzeug')
@@ -77,8 +83,8 @@ CURRENT_JOB_FILE = os.path.join(BASE_DIR, "current_job.json")
 # The Flask server writes JSON payloads here; engine.py polls this file to execute commands
 COMMAND_FILE = "/tmp/vop_cmd.json" 
 
-# Sentinel the engine's idle loop polls to show the framing/focus targets
-# (issue #198). The two routes below create/remove it. MUST match the path
+# Sentinel the engine's idle loop polls to show the framing/focus targets.
+# The two routes below create/remove it. MUST match the path
 # CAL_TARGETS_FILE in modules/engine.py.
 CAL_TARGETS_FILE = "/tmp/vop_cal_targets"
 
@@ -588,7 +594,7 @@ def count_source_frames(directory):
     """
     if not os.path.exists(directory):
         return 0
-    valid_exts = ('.png', '.jpg', '.jpeg', '.tif', '.tiff')
+    valid_exts = media_formats.STILL_IMAGE_EXTS
     return len([f for f in os.listdir(directory) if f.lower().endswith(valid_exts)])
 
 
@@ -763,7 +769,7 @@ def dispatch_engine(task, payload):
     # Guarantee background daemon is active before dispatching
     ensure_engine_running()
 
-    # SINGLE-OWNER CAMERA GUARD (issue #198).
+    # SINGLE-OWNER CAMERA GUARD.
     # The Calibration framing feed holds the sensor via rpicam-vid. Every
     # engine task that touches the camera does so via rpicam-still, which
     # would fail with "device busy" if the feed were still up. Stopping it
@@ -1385,7 +1391,7 @@ def get_img_aspect():
     else:
         check_dir = PROJ_MAG_DIR
     try:
-        valid_exts = ('.png', '.jpg', '.jpeg', '.tif', '.tiff')
+        valid_exts = media_formats.STILL_IMAGE_EXTS
         files = sorted([f for f in os.listdir(check_dir) if f.lower().endswith(valid_exts)])
         
         if files:
@@ -1539,7 +1545,7 @@ def calibration_targets_off():
 
 @app.route('/display_info', methods=['GET'])
 def display_info():
-    # Panel + sensor dimensions for the framing overlay (issue #198, Slice 3).
+    # Panel + sensor dimensions for the framing overlay.
     # The frontend uses the PANEL aspect to place the corner target boxes
     # where the on-screen crosshairs land in the sensor frame, and the SENSOR
     # dims to size the SVG viewBox 1:1 with the feed. get_display_size() reads

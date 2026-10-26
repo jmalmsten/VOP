@@ -33,7 +33,8 @@ import moderngl
 import numpy as np
 import os
 import cv2
-import collections # Required for OrderedDict access tracking
+import collections      # Required for OrderedDict access tracking
+import media_formats    # Shared STILL_IMAGE_EXTS list (also used by vop.py)
 
 def init_render_pipeline():
     vert = """
@@ -85,7 +86,7 @@ def init_render_pipeline():
     uniform float slice_low;
     uniform float slice_high;
 
-    // SWEEP uniforms (issue #230).
+    // SWEEP uniforms.
     // sweep_mode selects the luma-window filter applied to this
     // layer's pass: 0 = Bypass (default, shader behaves exactly
     // as pre-sweep), 1 = High Pass, 2 = Band Pass, 3 = Low Pass.
@@ -122,7 +123,7 @@ def init_render_pipeline():
             tex_col.rgb = clamp((tex_col.rgb - slice_low) / slice_width, 0.0, 1.0);
         }
 
-        // SWEEP LUMA-WINDOW FILTER (issue #230)
+        // SWEEP LUMA-WINDOW FILTER
         //
         // Runs AFTER the BRK slice remap (so it sees the same
         // values the panel would show) and BEFORE the gel
@@ -202,7 +203,7 @@ def init_render_pipeline():
     if 'slice_high' in prog:
         prog['slice_high'].value = 1.0
     
-    # SWEEP defaults (issue #230): initialize to Bypass so every
+    # SWEEP defaults: initialize to Bypass so every
     # code path that never touches the sweep uniforms - idle
     # branding, calibration, DRE, BRK, previews, everything -
     # renders exactly as it did before the sweep existed. The
@@ -234,7 +235,7 @@ def init_render_pipeline():
 def init_calibration_targets(ctx):
     """
     Build a SECOND, independent program + fullscreen quad that draws the
-    framing/focus targets (issue #198): corner crosshairs at a 10% inset
+    framing/focus targets: corner crosshairs at a 10% inset
     plus a centre moire (Siemens-star) focus pattern.
 
     Kept entirely separate from init_render_pipeline's textured-quad
@@ -296,8 +297,8 @@ def init_calibration_targets(ctx):
 
         // ---- CORNER CROSSHAIRS (10% inset from each edge) ----
         // A '+' at each of the four corners. Their CENTRES (0.1 / 0.9 in
-        // uv) are exactly what the feed-overlay boxes will target in
-        // Slice 3, and those centres are aspect-independent, which is why
+        // uv) are exactly what the feed-overlay boxes will target
+        // and those centres are aspect-independent, which is why
         // the crosshairs stay in plain uv space (only the centre circle
         // needs aspect correction). t = arm thickness, l = arm half-length.
         float t = 0.0015;
@@ -391,6 +392,10 @@ class TextureManager:
         # across multiple held frames without triggering premature eviction.
         self.max_capacity = max_capacity
 
+        # Paths we've already logged a decode failure for, so a broken file
+        # produces ONE warning instead of one per rendered frame.
+        self._warned_paths = set()
+
         # 1x1 pure-white texture used as a pass-through stand-in whenever a 
         # layer is hidden (eye-toggle off) or has no source frames on disk. 
         # White is multiplicatively identity in the blend pipeline, so swapping
@@ -399,7 +404,7 @@ class TextureManager:
         white = np.ones((1,1,3), dtype='uint8') * 255
         self.white_tex = ctx.texture((1,1), 3, white.tobytes())
 
-        valid_exts = ('.png', '.jpg', '.tif', '.tiff')
+        valid_exts = media_formats.STILL_IMAGE_EXTS
         base_path = os.path.dirname(proj_dir)  # parent of ProjMag = repo BASE_DIR
 
         # Scan every layer's folder once at job-start. Files are stored sorted
@@ -415,6 +420,14 @@ class TextureManager:
                     os.path.join(folder_path, f) for f in os.listdir(folder_path)
                     if f.lower().endswith(valid_exts)
                 ])
+                # DIAGNOSTIC: the upload route accepts any filename, so a file
+                # can land in the folder that we then silently skip. Say so.
+                skipped = [f for f in os.listdir(folder_path)
+                           if not f.lower().endswith(valid_exts)]
+                if skipped:
+                    print(f"[VOP WARNING] TextureManager: {folder_name} contains "
+                          f"file(s) with an unsupported extension, ignoring: {skipped}")
+
             else:
                 self.layer_files[layer_key] = []
 
@@ -430,7 +443,7 @@ class TextureManager:
         texture with a default 16:9 aspect ratio - the engine's render path
         special-cases white_tex to skip the geometry transform entirely.
         
-        Bit-depth handling (phase 2 of issue #169):
+        Bit-depth handling:
             OpenCV preserves the source dtype when reading 16-bit TIFFs, so 
             cv2.imread returns either uint8 or uint16 arrays depending on 
             the file. We detect this and upload accordingly:
@@ -478,9 +491,16 @@ class TextureManager:
         # cv2.IMREAD_UNCHANGED preserves both the alpha channel (for PNGs) 
         # AND the source bit depth (8 vs 16). Without this flag, OpenCV 
         # would auto-strip alpha AND silently downcast 16-bit TIFFs to 
-        # uint8 - which is exactly the 8bpc ceiling phase 2 is removing.
+        # uint8
         img = cv2.imread(f_path, cv2.IMREAD_UNCHANGED)
-        if img is None: 
+        if img is None:
+            # imread returns None for unreadable / unsupported files. We
+            # still fall back to white (behaviour unchanged), but say why,
+            # once per file.
+            if f_path not in self._warned_paths:
+                self._warned_paths.add(f_path)
+                print(f"[VOP WARNING] TextureManager: OpenCV could not decode "
+                      f"{f_path}; showing white pass-through instead.")
             return self.white_tex, 1.777
 
         # ----- Alpha premultiply (dtype-aware) ----------------------------
@@ -518,7 +538,7 @@ class TextureManager:
             # have COMPLETELY different bit layouts. A uint16 value of 65535 
             # would, if reinterpreted as a float16, be +Inf - not 1.0. So we 
             # cannot just hand the uint16 buffer to moderngl with dtype='f2' 
-            # and hope for the best (an earlier phase-2 implementation did 
+            # and hope for the best (an earlier implementation did 
             # exactly this and produced garbage on real 16-bit gradient 
             # sources - looked plausible on solid colors but wrong on ramps).
             # 

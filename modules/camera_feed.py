@@ -1,7 +1,7 @@
 """
 VOP Module:     camera_feed.py
 Description:    Live MJPEG preview feed from the IMX477 for the
-                Calibration page's framing / focus tool (issue #198).
+                Calibration page's framing / focus tool.
 
                 Unlike camera_hardware.trigger_capture (one rpicam-still
                 per exposure), this runs rpicam-vid CONTINUOUSLY and
@@ -54,7 +54,7 @@ import threading
 # the WHOLE sensor in the feed so the framing overlay shows the real
 # sensor edges, and high enough resolution that 1:1 zoom is sharp enough
 # to judge focus. MJPEG at this size is well within the Pi 4 encoder +
-# gigabit budget (the old align tool ran 2028x1520 mjpeg at 30fps).
+# gigabit budget.
 FEED_WIDTH  = 2028
 FEED_HEIGHT = 1520
 
@@ -62,12 +62,12 @@ FEED_HEIGHT = 1520
 # a sensor mode from --width/--height and can land on a CROPPED mode that
 # doesn't see the whole sensor - which would make the framing overlay lie
 # about where the sensor edges are. 2028:1520:12:P = full frame, 12-bit,
-# packed. Same reasoning as the old vop_setup_align.py.
+# packed.
 FEED_SENSOR_MODE = "2028:1520:12:P"
 
 # Frame rate. Alignment/focus is a near-static visual task, so we trade
 # motion smoothness for bitrate headroom (more bits per frame = sharper
-# detail at the same bandwidth). 8-30 are all acceptable per the issue;
+# detail at the same bandwidth).;
 # 20 is a comfortable middle that still feels live when nudging the rig.
 FEED_FPS = 20
 

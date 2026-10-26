@@ -1,6 +1,6 @@
 """
 VOP tool: tools/smooth_diag.py
-Description:    Off-Pi diagnostic for SSS smooth interpolation (issue #155).
+Description:    Off-Pi diagnostic for SSS smooth interpolation.
 
                Builds a real interpolator.Timeline from a synthetic SSS job
                and probes the velocity of the master position just before and
