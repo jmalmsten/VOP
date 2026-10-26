@@ -32,7 +32,7 @@
 <head>
     <meta charset="UTF-8">
     <title>VOP v26.1</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=55">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=56">
 </head>
 <body>
     <div class="container">
@@ -220,8 +220,8 @@
                              below for the Sweep controls without making the
                              group box taller. -->
                         <div class="c-box fit-fill-row">
-                            <button class="mini-btn" onclick="calcFitScale('bipack1_coord_scale', 'fit_z', 'bipack1', 'fit')" title="Scale image to fit entirely inside the projection frustum (letterbox/pillarbox)">FIT FOV</button>
-                            <button class="mini-btn" onclick="calcFitScale('bipack1_coord_scale', 'fit_z', 'bipack1', 'fill')" title="Scale image to fill the entire projection frustum (overflow on shorter axis)">FILL FOV</button>
+                            <button class="mini-btn" onclick="calcFitScale('bipack1_coord_scale', 'bipack1_fit_z', 'bipack1', 'fit')" title="Scale image to fit entirely inside the projection frustum (letterbox/pillarbox)">FIT FOV</button>
+                            <button class="mini-btn" onclick="calcFitScale('bipack1_coord_scale', 'bipack1_fit_z', 'bipack1', 'fill')" title="Scale image to fill the entire projection frustum (overflow on shorter axis)">FILL FOV</button>
                         </div>
                     </div>
                     <!-- SWEEP (issue #230). Luma-window filter that rides the
@@ -266,8 +266,8 @@
                              below for the Sweep controls without making the
                              group box taller. -->
                         <div class="c-box fit-fill-row">
-                            <button class="mini-btn" onclick="calcFitScale('bipack2_coord_scale', 'fit_z', 'bipack2', 'fit')" title="Scale image to fit entirely inside the projection frustum (letterbox/pillarbox)">FIT FOV</button>
-                            <button class="mini-btn" onclick="calcFitScale('bipack2_coord_scale', 'fit_z', 'bipack2', 'fill')" title="Scale image to fill the entire projection frustum (overflow on shorter axis)">FILL FOV</button>
+                            <button class="mini-btn" onclick="calcFitScale('bipack2_coord_scale', 'bipack2_fit_z', 'bipack2', 'fit')" title="Scale image to fit entirely inside the projection frustum (letterbox/pillarbox)">FIT FOV</button>
+                            <button class="mini-btn" onclick="calcFitScale('bipack2_coord_scale', 'bipack2_fit_z', 'bipack2', 'fill')" title="Scale image to fill the entire projection frustum (overflow on shorter axis)">FILL FOV</button>
                         </div>
                     </div>
                     <!-- SWEEP (issue #230). Luma-window filter that rides the
