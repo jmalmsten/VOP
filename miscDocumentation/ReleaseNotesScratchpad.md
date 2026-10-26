@@ -1,9 +1,11 @@
-# v26.1.3
+# v26.2.4
 
 ## Notes: 
 The second release since the big move to GitHub. 
 
 I have now gotten into the habit of marking changes with the patch number so it's easier to keep track of what happened when between releases. 
+
+If you noticed that things jumped from v26.1.3 to 26.2.4 without a release. It's because I realized I messed up in my philosopy for the version numbering. From now on. Once A release is made, like for v26.1.x, the release number gets bumped for subsequent patches. And The patches get numbered v26.2.1 and so on. This means that the release on GitHub is made with the latest patches and won't get new patches afterwards. So the next release will be something like v26.2.15 or something. I don't know exactly when. I don't have a set in stone release cycle for this repo. 
 
 ## Added:
 ### Patch 1: #247 - Full Screen preview window
