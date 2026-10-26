@@ -2236,3 +2236,67 @@ body.brk-mode .brk-probe-controls {
         display: none;
     }
 }
+
+@media (max-width: 1400px){
+
+    /* The LED readout used to float right, and a float taller than the 
+     * title line pokes out below the title's border and squeezes
+     * whatever comes next. As a flex row the readout is a normal item
+     * (float is ignored on flex items) and the title grows to hold it. */
+    .mags-row .group-title {
+        display:            flex;
+        justify-content:    space-between;
+        align-items:        center;
+        gap:                8px;
+    }
+
+    /* Keep the LED digits on one line. If the title is long, the title
+     * text wraps instead of the LED. */
+    .mags-row .gate-frames {
+        flex:           0 0 auto;
+        white-space:    nowrap;
+    }
+
+    /* UPLOAD / NUKE  rows let the cluster wrap... */
+    .mags-row .upload-cluster {
+        flex-wrap:  wrap;
+    }
+    /* ...and make the filename block claim a full line, which pushes the 
+     * buttons onto their own line below it. This also convers Cam Mag,
+     * whose "Active Reel" block is a plain .c-box. */
+    .mags-row .upload-cluster > .c-box {
+        flex:   1 1 100%;
+    }
+
+    /* Label above the eye + filename instead of beside them. Beside
+     * them, the label alone ate ~100px of a ~200px panel. */
+    .mags-row .layer-vis-box {
+        flex-direction:     column;
+        align-items:        stretch;
+    }
+
+    /* UPLOAD and NUKE share their line 50/50. Bigger thumb targets. */
+    .mags-row .upload-cluster >.mini-btn {
+        flex:   1 1 0;
+    }
+
+    /* Let the Ref Z / World Scale /FIT-FILL row wrap so FIT-FILL can
+     * fall to a line of its own under the two number inputs. */
+    .mags-row .input-row {
+        flex-wrap:  wrap;
+    }
+
+    /* FIT FOV / FILL FOV take a full line, split 50/50. */
+    .mags-row .fit-fill-row {
+        flex:   1 1 100%;
+    }
+    .mags-row .fit-fill-row > .mini-btn {
+        flex:   1 1 0;
+    }
+
+    /* A bit more air between the new FIT/FILL line and Sweep. The base
+     * 4px assumed the buttons sat beside the iputs. */
+    .mags-row .sweep-row {
+        margin-top:     10px;
+    }
+}

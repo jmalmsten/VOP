@@ -38,3 +38,8 @@ When adding the screen timeout I found that the journalctl is spammed with redun
 
 ### Patch 3: Fixing the screen timeout
 Turned out the implementation of the screen timeout was a bit naive. So I have done the screen timeout a bit differently now. 
+
+### Patch 4: Narrow viewport fix and fit_z fix
+To make the webGUI more usable on narrow viewports like phones. I had to add in a little css to rearrange the buttons for the mags. Shouldn't change layout on the desktop view in full HD screens. 
+
+fit_z also was still not fixed. Went ahead and did that. 
