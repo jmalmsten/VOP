@@ -42,9 +42,10 @@ import socket
 import time
 import threading
 import signal
+import media_formats # shared STILL_IMAGE_EXTS list (also used by graphics_utils.py)
 import numpy as np  # for 16-bit → 8-bit reduction in /cam_probe
 from flask import Flask, jsonify, request, render_template, send_from_directory, send_file, Response
-import media_formats # shared STILL_IMAGE_EXTS list (also used by graphics_utils.py)
+
 
 
 # Append the modules directory to the system path for local imports
