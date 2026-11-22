@@ -35,6 +35,13 @@ import rawpy
 import numpy as np
 import json
 
+# LibRaw's "adjust maximum" feature: if an image's brightest raw value lands
+# between this fraction and 100% of the sensor white level. LibRaw lowers the 
+# white point to that brightest value and stretches the WHOLE frame to match.
+# Default is 0.75. Setting 0.0 turns it off entirely (note: values above
+# -1.0 silently fall back to the default. so 0.0 is the correct "off")
+RAW_ADJUST_MAXIMUM_THR = 0.0
+
 def apply_pedestal(img_16bit, clip_val):
     """
     Subtracts the noise floor pedestal in a float 32 workspace to prevent underflow,
@@ -196,7 +203,8 @@ def generate_sensor_preview(buffer_file, static_dir, cam_gel_rgb, mono_forced, b
 
     try:
         with rawpy.imread(buffer_file) as raw:
-            rgb = raw.postprocess(gamma=(1,1), no_auto_bright=True, output_bps=16)
+            rgb = raw.postprocess(gamma=(1,1), no_auto_bright=True, output_bps=16,
+                                  adjust_maximum_thr=RAW_ADJUST_MAXIMUM_THR)
         
         # --- Patch defective pixels immediately ---
         rgb = apply_hot_pixel_patch(rgb, static_dir)
@@ -289,7 +297,8 @@ def generate_comp_preview(buffer_file, static_dir, cam_mag_dir, frame_num,
         # Same call as both sibling functions, so the preview math sees the
         # same raw data the real exposure would.
         with rawpy.imread(buffer_file) as raw:
-            rgb = raw.postprocess(gamma=(1,1), no_auto_bright=True, output_bps=16)
+            rgb = raw.postprocess(gamma=(1,1), no_auto_bright=True, output_bps=16,
+                                  adjust_maximum_thr=RAW_ADJUST_MAXIMUM_THR)
 
         # --- Patch defective pixels immediately (16-bit) ---
         rgb = apply_hot_pixel_patch(rgb, static_dir)
@@ -415,7 +424,8 @@ def dng_to_uint16_rgb(buffer_file, static_dir, black_clip=0.0):
         # no_auto_bright     - no automatic exposure compensation
         # output_bps=16      - full 16-bit precision
         with rawpy.imread(buffer_file) as raw:
-            rgb = raw.postprocess(gamma=(1, 1), no_auto_bright=True, output_bps=16)
+            rgb = raw.postprocess(gamma=(1, 1), no_auto_bright=True, output_bps=16,
+                                  adjust_maximum_thr=RAW_ADJUST_MAXIMUM_THR)
 
         # Hot pixel patching (uses defect map from static_dir).
         # Identical to process_and_stack_latent_image's call.
@@ -710,7 +720,8 @@ def process_and_stack_latent_image(buffer_file, static_dir, output_file, tiff_fl
 
     try:
         with rawpy.imread(buffer_file) as raw:
-            rgb = raw.postprocess(gamma=(1,1), no_auto_bright=True, output_bps=16)
+            rgb = raw.postprocess(gamma=(1,1), no_auto_bright=True, output_bps=16,
+                                  adjust_maximum_thr=RAW_ADJUST_MAXIMUM_THR)
         
         # --- Patch defective pixels immediately ---
         rgb = apply_hot_pixel_patch(rgb, static_dir)
@@ -776,7 +787,8 @@ def measure_noise_floor(buffer_file, static_dir):
     try:
         with rawpy.imread(buffer_file) as raw:
             # Strictly linear 16-bit extraction
-            rgb = raw.postprocess(gamma=(1,1), no_auto_bright=True, output_bps=16)
+            rgb = raw.postprocess(gamma=(1,1), no_auto_bright=True, output_bps=16,
+                                  adjust_maximum_thr=RAW_ADJUST_MAXIMUM_THR)
         
         # Patch hot pixels first so they don't contaminate the measurement
         rgb = apply_hot_pixel_patch(rgb, static_dir)
@@ -909,7 +921,8 @@ def measure_centre_brightness(buffer_file, static_dir, patch_fraction=0.05,
         # nice"), output_bps=16 preserves full sensor precision.
         with rawpy.imread(buffer_file) as raw:
             rgb = raw.postprocess(gamma=(1, 1), no_auto_bright=True,
-                                  output_bps=16)
+                                  output_bps=16, 
+                                  adjust_maximum_thr=RAW_ADJUST_MAXIMUM_THR)
 
         # Patch hot pixels before measurement so a single stuck pixel
         # in the metering region doesn't drag any metric upward and
@@ -1034,7 +1047,8 @@ def map_hot_pixels(buffer_file, static_dir):
 
     try:
         with rawpy.imread(buffer_file) as raw:
-            rgb = raw.postprocess(gamma=(1,1), no_auto_bright=True, output_bps=16)
+            rgb = raw.postprocess(gamma=(1,1), no_auto_bright=True, output_bps=16,
+                                  adjust_maximum_thr=RAW_ADJUST_MAXIMUM_THR)
         
         # Convert to grayscale to measure pure intensity
         gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
