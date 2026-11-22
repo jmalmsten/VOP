@@ -891,6 +891,13 @@ def run_persistent_engine():
                     pygame.event.pump()
                     show_black_frame()
                 
+                # Per-frame timing buckets for the image phase (milliseconds).
+                # build = CPU work to issue the draw calls (state interpolation,
+                #         matrices, uniform writes - Python side)
+                # gpu   = time ctx.finish() waits for the GPU to actually finish
+                # flip  = time spent blocked waiting for the vsync swap
+                t_build_ms, t_gpu_ms, t_flip_ms = [], [], []
+
                 # Image phase. t_norm is based on the frame index(0.0 on the 
                 # first frame, 1.0 on the last), matching the old start/end
                 # convention, so smear endpoints land where the keyframes say.
@@ -900,9 +907,16 @@ def run_persistent_engine():
                 for i in range(image_flips):
                     pygame.event.pump()
                     t_norm = i / max(1, image_flips -1)
+                    t_a = time.perf_counter()
                     render_world(frame_num, t_norm, is_preview=False)
+                    t_b = time.perf_counter()
                     ctx.finish()
+                    t_c = time.perf_counter()
                     pygame.display.flip()
+                    t_now = time.perf_counter()
+                    t_build_ms.append((t_b - t_a) * 1000.0)
+                    t_gpu_ms.append((t_c - t_b) * 1000.0)
+                    t_flip_ms.append((t_now - t_c) * 1000.0)
                     t_now = time.perf_counter()
                     if t_img0 is None:
                         t_img0 = t_now      # first image flip has returned
@@ -926,10 +940,10 @@ def run_persistent_engine():
                 # A gap means slow renders (slow_flips > 0) or a bad refresh value.
                 measured_ms = (t_img1 - t_img0) * 1000.0
                 ideal_ms    = image_flips * HDMI_REFRESH_MS
-                log_audit(f"EXPOSURE {frame_num} | image time: requested {smr_ms:.1f}ms, "
-                          f"{image_flips} flips, ideal {ideal_ms:.1f}ms, "
-                          f"MEASURED {measured_ms:.1f}ms (slow flips: {slow_flips}, "
-                          f"panel {1000.0 / HDMI_REFRESH_MS:.2f}Hz)")
+                log_audit(f"EXPOSURE {frame_num} | per-frame ms avg/max: "
+                          f"build {sum(t_build_ms)/len(t_build_ms):.1f}/{max(t_build_ms):.1f}, "
+                          f"GPU {sum(t_gpu_ms)/len(t_gpu_ms):.1f}/{max(t_gpu_ms):.1f}, "
+                          f"flip {sum(t_flip_ms)/len(t_flip_ms):.1f}/{max(t_flip_ms):.1f}")
                 
                 # ---------------------------------------------------------
                 # POST-EXPOSURE BLACKOUT
