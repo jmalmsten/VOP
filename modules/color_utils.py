@@ -39,7 +39,7 @@ import json
 # between this fraction and 100% of the sensor white level. LibRaw lowers the 
 # white point to that brightest value and stretches the WHOLE frame to match.
 # Default is 0.75. Setting 0.0 turns it off entirely (note: values above
-# -1.0 silently fall back to the default. so 0.0 is the correct "off")
+# 1.0 silently fall back to the default. so 0.0 is the correct "off")
 RAW_ADJUST_MAXIMUM_THR = 0.0
 
 def apply_pedestal(img_16bit, clip_val):

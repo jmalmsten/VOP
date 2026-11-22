@@ -275,11 +275,11 @@ def run_persistent_engine():
     # We grab the KMSDRM lock here once. We never let it go.
     # ---------------------------------------------------------
     try:
-        screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.OPENGL | pygame.DOUBLEBUF | pygame.FULLSCREEN)
+        screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.OPENGL | pygame.DOUBLEBUF | pygame.FULLSCREEN, vsync=1)
     except pygame.error:
         log_audit("Hardware busy, retrying KMSDRM lock in 1s...")
         time.sleep(1.0)
-        screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.OPENGL | pygame.DOUBLEBUF | pygame.FULLSCREEN)
+        screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.OPENGL | pygame.DOUBLEBUF | pygame.FULLSCREEN, vsync=1)
     
     ctx, prog, vao = gfx.init_render_pipeline()
 
@@ -860,8 +860,6 @@ def run_persistent_engine():
                 log_audit(f"[{datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}] EXPOSURE {frame_num} | Wait complete. Boot delay: {boot_delay:.1f}ms")
                 log_audit(f"[{datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}] EXPOSURE {frame_num} | Starting HDMI sequence (500ms pre-roll)")
 
-                frame_rendered = False
-
                 # ---------------------------------------------------------
                 # FLIP-COUNTED SEQUENCE (replaces the wall-clock while loop)
                 # Each pygame.display.flip() blocks until the next vsync, so
@@ -881,7 +879,7 @@ def run_persistent_engine():
                     # forces a real buffer swap so the panel is truly black.
                     ctx.screen.use()
                     ctx.clear(0.0, 0.0, 0.0, 1.0)
-                    prog['mvp'].write(np.eye(4, dtype='4'), tobytes())
+                    prog['mvp'].write(np.eye(4, dtype='f4').tobytes())
                     prog['filter_color'].write(np.array([0.0, 0.0, 0.0], dtype='f4'))
                     tex_mgr.white_tex.use(0)
                     vao.render(moderngl.TRIANGLE_STRIP)
@@ -909,7 +907,7 @@ def run_persistent_engine():
                     if t_img0 is None:
                         t_img0 = t_now      # first image flip has returned
                     elif (t_now -t_prev) * 1000.0 > HDMI_REFRESH_MS * 1.5:
-                        sslow_flips += 1    # render took longer than a refresh
+                        slow_flips += 1    # render took longer than a refresh
                     t_prev = t_now
 
                 # Black tail. The FIRST black flip's return marks the moment
