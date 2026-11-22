@@ -71,3 +71,6 @@ Found that while jpg is loaded as expected. jpeg however was not loaded and the 
 
 ### Patch 11: Fixing some of the flickery exposures
 adding a variable to turn off adjust_maximum_thr by setting it to 0.0 so it doesnt' adjust the brightness of the captures. This hopefully makes for less flickery sequences. Especially with live-action transfers. 
+
+### Patch 12: More exposure flicker fixes
+Rebuilding how the VOP counts time. This also to minimize flickering. 

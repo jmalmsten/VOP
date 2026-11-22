@@ -92,6 +92,11 @@ signal.signal(signal.SIGTERM, handle_sigterm)
 def log_audit(msg): 
     print(f"[{time.strftime('%H:%M:%S')}] AUDIT (v0.2.6): {msg}", flush=True)
 
+# Fallback refresh period (60 Hz) used only if the boot-time measurement of
+# the real panel refresh (see the measure step in the engine setup) gives a 
+# nonsense answer. The live value is HDMI_REFRESH_MS, measured at startup
+DEFAULT_HDMI_REFRESH_MS = 1000.0 / 60.0
+
 def validate_black_clip(raw_clip):
     """
     Coerces and sanity-checks the noise crusher input.
@@ -277,6 +282,29 @@ def run_persistent_engine():
         screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.OPENGL | pygame.DOUBLEBUF | pygame.FULLSCREEN)
     
     ctx, prog, vao = gfx.init_render_pipeline()
+
+    # Measure the panel's REAL refresh period instead of assuming 60 Hz
+    # Black flips only: nothing is being exposed yet, so this is safe at boot.
+    # We time 45 flips and skip the first interval (it can include setup
+    # stall), then take the MEDIAN so one hiccup can't skew the result.
+    # HAndles 30/60/120 HJz and odd rates like 59.94 with no config.
+    _stamps = []
+    for _ in range(45):
+        ctx.screen.use()
+        ctx.clear(0.0, 0.0, 0.0, 1.0)
+        pygame.display.flip()
+        _stamps.append(time.perf_counter())
+    _deltas = sorted ((b - a) * 1000.0 for a, b in zip(_stamps[1:], _stamps[2:]))
+    _measured_ms = _deltas[len(_deltas) // 2]
+
+    # Sanity window (20 Hz to 250 Hz). Outside it, flip() probably isn't
+    # blocking on vsync at all, so fall back to 60 Hz and say so loudly.
+    if 4.0 <= _measured_ms <= 50.0:
+        HDMI_REFRESH_MS = _measured_ms
+    else:
+        HDMI_REFRESH_MS = DEFAULT_HDMI_REFRESH_MS
+        log_audit(f"WARNING: refresh measure gave {_measured_ms:.2f}ms -flip() may not be vsync-blocked; using default")
+    log_audit(f"Panel refresh period: {HDMI_REFRESH_MS:.3f}ms ({1000.0 / HDMI_REFRESH_MS:.2f} Hz)")
 
     # Calibration framing/focus targets: its own program +
     # fullscreen quad, drawn in the idle branch while CAL_TARGETS_FILE
@@ -834,33 +862,76 @@ def run_persistent_engine():
 
                 frame_rendered = False
 
-                while (time.time() - anchor) * 1000 < total_ms:
-                    pygame.event.pump()
-                    elapsed = (time.time() - anchor) * 1000
+                # ---------------------------------------------------------
+                # FLIP-COUNTED SEQUENCE (replaces the wall-clock while loop)
+                # Each pygame.display.flip() blocks until the next vsync, so
+                # N flips of the image = N whole refresh periods on the panel.
+                # The old loop decided the window with the time.time(), which sits
+                # at a random phase relative to the vsync grid, so the image
+                # was on screen for floor() or ceil() frames at random. That
+                # is up to one refresh period (16.7 ms at 60 Hz) of exposure
+                # jitter. Counting flips removes it.
+                # ---------------------------------------------------------
+                pre_flips   = max(1, int(round(500.0 /HDMI_REFRESH_MS)))    # Black header
+                image_flips = max(1, int(round(smr_ms /HDMI_REFRESH_MS)))   # The exposure
+                post_flips  = max(1, int(round(500.0 /HDMI_REFRESH_MS)))    # Black tail
 
-                    in_window = 500.0 <= elapsed <= (500.0 + smr_ms)
-                    missed_window = (elapsed > 500.0) and not frame_rendered
-
-                    if in_window or missed_window:
-                        if not frame_rendered:
-                             log_audit(f"[{datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}] EXPOSURE {frame_num} | First image frame rendered at {elapsed:.1f}ms")
-
-                        clamped_elapsed = min(elapsed, 500.0 + smr_ms)
-                        t_norm = (clamped_elapsed - 500.0) / max(1.0, smr_ms)
-                        render_world(frame_num, t_norm, is_preview=False)
-                        frame_rendered = True
-                    else:
-                        # OPTICAL SHUTTER ENFORCEMENT
-                        # Draw a physical black quad to force the GPU to swap the buffer
-                        ctx.screen.use()
-                        ctx.clear(0.0, 0.0, 0.0, 1.0)
-                        prog['mvp'].write(np.eye(4, dtype='f4').tobytes())
-                        prog['filter_color'].write(np.array([0.0, 0.0, 0.0], dtype='f4'))
-                        tex_mgr.white_tex.use(0)
-                        vao.render(moderngl.TRIANGLE_STRIP)
-
-                    ctx.finish()  
+                def show_black_frame():
+                    # The same "optical shutter" black quad the old loop drew:
+                    # forces a real buffer swap so the panel is truly black.
+                    ctx.screen.use()
+                    ctx.clear(0.0, 0.0, 0.0, 1.0)
+                    prog['mvp'].write(np.eye(4, dtype='4'), tobytes())
+                    prog['filter_color'].write(np.array([0.0, 0.0, 0.0], dtype='f4'))
+                    tex_mgr.white_tex.use(0)
+                    vao.render(moderngl.TRIANGLE_STRIP)
+                    ctx.finish()
                     pygame.display.flip()
+                
+                # Black header: the projection-side shutter is closed.
+                for _ in range(pre_flips):
+                    pygame.event.pump()
+                    show_black_frame()
+                
+                # Image phase. t_norm is based on the frame index(0.0 on the 
+                # first frame, 1.0 on the last), matching the old start/end
+                # convention, so smear endpoints land where the keyframes say.
+                slow_flips = 0
+                t_prev = time.perf_counter()
+                t_img0 = None
+                for i in range(image_flips):
+                    pygame.event.pump()
+                    t_norm = i / max(1, image_flips -1)
+                    render_world(frame_num, t_norm, is_preview=False)
+                    ctx.finish()
+                    pygame.display.flip()
+                    t_now = time.perf_counter()
+                    if t_img0 is None:
+                        t_img0 = t_now      # first image flip has returned
+                    elif (t_now -t_prev) * 1000.0 > HDMI_REFRESH_MS * 1.5:
+                        sslow_flips += 1    # render took longer than a refresh
+                    t_prev = t_now
+
+                # Black tail. The FIRST black flip's return marks the moment
+                # the image left the screen, so timestamp it for the audit line
+                for j in range(post_flips):
+                    pygame.event.pump()
+                    show_black_frame()
+                    if j == 0:
+                        t_img1 = time.perf_counter()
+                
+                # AUDIT: the actual exposure, in milliseconds.
+                #   Requested   = the EXP you asked for
+                #   ideal       = whole flips * refresh perios (what we aimed for)
+                #   measured    = real time the image was up, from timestamps
+                # measured ~= ideal means every flip was exactly one vsync.
+                # A gap means slow renders (slow_flips > 0) or a bad refresh value.
+                measured_ms = (t_img1 - t_img0) * 1000.0
+                ideal_ms    = image_flips * HDMI_REFRESH_MS
+                log_audit(f"EXPOSURE {frame_num} | image time: requested {smr_ms:.1f}ms, "
+                          f"{image_flips} flips, ideal {ideal_ms:.1f}ms, "
+                          f"MEASURED {measured_ms:.1f}ms (slow flips: {slow_flips}, "
+                          f"panel {1000.0 / HDMI_REFRESH_MS:.2f}Hz)")
                 
                 # ---------------------------------------------------------
                 # POST-EXPOSURE BLACKOUT
