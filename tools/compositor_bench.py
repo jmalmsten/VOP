@@ -166,6 +166,37 @@ void main() {
     f_color = vec4(pm * bp1 * bp2, 1.0);
 }
 """
+# =====================================================================
+# THE LEAN SHADER (old multi-pass structure, minimal fragment work)
+# =====================================================================
+# Same vertex shader as the engine's. The fragment shader keeps ONLY
+# "texture x gel colour" - no slice remap, no sweep, no mono. The engine's
+# shader carries all of those and the GPU appears to execute them for
+# every pixel even when they are switched off; this variant is used for
+# every draw that doesn't need them.
+LEAN_VERT = """
+#version 300 es
+layout (location = 0) in vec2 in_vert;
+layout (location = 1) in vec2 in_tex;
+uniform mat4 mvp;
+out vec2 v_tex;
+void main() {
+    gl_Position = mvp * vec4(in_vert, 0.0, 1.0);
+    v_tex = in_tex;
+}
+"""
+
+LEAN_FRAG = """
+#version 300 es
+precision mediump float;
+uniform sampler2D TexUnit;
+uniform vec3 filter_color;
+in vec2 v_tex;
+out vec4 f_color;
+void main() {
+    f_color = texture(TexUnit, v_tex) * vec4(filter_color, 1.0);
+}
+"""
 
 def make_context(headless, size):
     """Return (ctx, width, height). headless=False mirrors engine.py:
@@ -223,7 +254,7 @@ def layer(tex, asp, scale, mpos=(0, 0, -1.0), mrot=(0, 0, 0),
 
 
 def clone_scene(sc):
-    """Copy a scene so edits don't leak into the original. copy.deepcopy
+    """Copy a scene so edits dont leak into the original. copy.deepcopy
     can't be used: GPU texture objects can't be copied. The numpy arrays
     inside are only ever replaced, never edited in place, so copying the
     dicts is enough."""
@@ -351,16 +382,25 @@ class Rig:
         p['tex_bp1'].value = 1
         p['tex_bp2'].value = 2
 
+                # ---- LEAN path: same quad data as the engine's VAO ----------
+        self.lean_prog = ctx.program(vertex_shader=LEAN_VERT,
+                                     fragment_shader=LEAN_FRAG)
+        verts = np.array([-1, 1, 0, 1,   1, 1, 1, 1,
+                          -1, -1, 0, 0,  1, -1, 1, 0], dtype='f4')
+        self.lean_vao = ctx.vertex_array(
+            self.lean_prog,
+            [(ctx.buffer(verts), '2f 2f', 'in_vert', 'in_tex')])
+
     # ---- matrix helpers --------------------------------------------
     def mvp(self, L, sc):
-        """The engine's real MVP for one layer (bytes, f4, row-major)."""
+        """The engines real MVP for one layer (bytes, f4, row-major)."""
         return vmath.get_frustum_fit_matrix(
             FOV, L['asp'], L['scale'], L['mpos'], L['mrot'],
             L['lpos'], L['lrot'], self.w, self.h,
             par_x=sc['par'][0], par_y=sc['par'][1], rot_order='XYZ')
 
     def hinv(self, L, sc):
-        """Inverse of the MVP's z-dropped 3x3, ready to upload as mat3."""
+        """Inverse of the MVPs z-dropped3x3, ready to upload as mat3."""
         # pyrr stores its matrices transposed relative to GL's column
         # vectors; .T gives the matrix GL actually multiplies by.
         G = np.frombuffer(self.mvp(L, sc), dtype='f4').reshape(4, 4).T
@@ -374,14 +414,27 @@ class Rig:
         return np.ascontiguousarray(inv.T, dtype='f4').tobytes()
 
     # ---- OLD: same passes as engine.render_world -------------------
-    def render_old(self, sc):
-        ctx, prog, vao = self.ctx, self.prog, self.vao
-        prog['mono_mode'].value = bool(sc['mono'])
-        prog['sweep_pos'].value = float(sc['t'])
+    def render_old(self, sc, lean=False):
+        ctx = self.ctx
+        self.prog['mono_mode'].value = bool(sc['mono'])
+        self.prog['sweep_pos'].value = float(sc['t'])
 
-        def set_sweep(cfg):
-            prog['sweep_mode'].value = cfg[0]
-            prog['sweep_width'].value = cfg[1]
+        def draw(tex, mvp, gel, cfg, multiply_pass=False):
+            """One textured-quad draw. cfg = (sweep mode, width).
+            With lean=True the minimal shader is used whenever this draw
+            needs no sweep and no mono. The multiply passes always qualify:
+            their input is already grey when mono is on, so mono again
+            would change nothing."""
+            if lean and cfg[0] == 0 and (multiply_pass or not sc['mono']):
+                p, v = self.lean_prog, self.lean_vao
+            else:
+                p, v = self.prog, self.vao
+                p['sweep_mode'].value = cfg[0]
+                p['sweep_width'].value = cfg[1]
+            p['mvp'].write(mvp)
+            p['filter_color'].write(np.array(gel, dtype='f4'))
+            tex.use(0)
+            v.render(moderngl.TRIANGLE_STRIP)
 
         # PASS 1 + 2: bipack layers into their FBOs
         for key, fbo in (('bp1', self.bp1_fbo), ('bp2', self.bp2_fbo)):
@@ -391,11 +444,7 @@ class Rig:
                 fbo.clear(1.0, 1.0, 1.0, 1.0)
                 continue
             fbo.clear(0.0, 0.0, 0.0, 1.0)
-            prog['mvp'].write(self.mvp(L, sc))
-            prog['filter_color'].write(np.array([1, 1, 1], dtype='f4'))
-            set_sweep(L['sweep'])
-            L['tex'].use(0)
-            vao.render(moderngl.TRIANGLE_STRIP)
+            draw(L['tex'], self.mvp(L, sc), (1, 1, 1), L['sweep'])
 
         # PASS 3: PM to the "screen"
         self.out_fbo.use()
@@ -405,24 +454,18 @@ class Rig:
             mvp, tex = self.mvp(pm, sc), pm['tex']
         else:
             mvp, tex = np.eye(4, dtype='f4').tobytes(), self.white_tex
-        prog['mvp'].write(mvp)
-        prog['filter_color'].write(np.array(sc['gel'], dtype='f4'))
-        set_sweep(pm['sweep'])
-        tex.use(0)
-        vao.render(moderngl.TRIANGLE_STRIP)
+        draw(tex, mvp, sc['gel'], pm['sweep'])
 
         # PASS 4 + 5: multiply the bipack FBOs over it
         ctx.enable(moderngl.BLEND)
         ctx.blend_func = (moderngl.DST_COLOR, moderngl.ZERO)
-        prog['mvp'].write(np.eye(4, dtype='f4').tobytes())
-        prog['filter_color'].write(np.array([1, 1, 1], dtype='f4'))
-        set_sweep((0, 0.0))
-        self.bp1_tex.use(0)
-        vao.render(moderngl.TRIANGLE_STRIP)
-        self.bp2_tex.use(0)
-        vao.render(moderngl.TRIANGLE_STRIP)
+        eye = np.eye(4, dtype='f4').tobytes()
+        draw(self.bp1_tex, eye, (1, 1, 1), (0, 0.0), multiply_pass=True)
+        draw(self.bp2_tex, eye, (1, 1, 1), (0, 0.0), multiply_pass=True)
         ctx.disable(moderngl.BLEND)
 
+    def render_lean(self, sc):
+        self.render_old(sc, lean=True)
     # ---- NEW: one draw ---------------------------------------------
     def render_new(self, sc):
         p = self.new_prog
@@ -452,20 +495,23 @@ class Rig:
 def run_diff(rig, scenes, save_dir):
     print("\nPIXEL DIFF  (old three-pass  vs  new single-pass)")
     print(f"{'scene':<30} {'max':>4} {'mean':>7} {'>2 px':>9} {'>8 px':>9} "
-          f"{'>32 px':>9}  verdict")
+          f"{'>32 px':>9} {'lean max':>9}  verdict")
     worst = 0
     for name, sc in scenes:
         rig.render_old(sc)
         a = rig.read_out()
         rig.render_new(sc)
         b = rig.read_out()
+        rig.render_lean(sc)
+        c = rig.read_out()
+        lean_max = int(np.abs(a.astype('i2') - c.astype('i2')).max())
         d = np.abs(a.astype('i2') - b.astype('i2')).max(axis=2)
         n2, n8, n32 = int((d > 2).sum()), int((d > 8).sum()), int((d > 32).sum())
         frac8 = n8 / d.size
         ok = frac8 < 0.001               # < 0.1 % of pixels differ visibly
         worst = max(worst, int(d.max()))
         print(f"{name:<30} {int(d.max()):>4} {d.mean():>7.3f} {n2:>9} {n8:>9} "
-              f"{n32:>9}  {'OK' if ok else 'LOOK AT PNG'}")
+              f"{n32:>9} {lean_max:>9}  {'OK' if ok else 'LOOK AT PNG'}")
         if save_dir:
             os.makedirs(save_dir, exist_ok=True)
             slug = name.replace(' ', '_').replace(',', '').replace('+', 'p')
@@ -479,17 +525,19 @@ def run_diff(rig, scenes, save_dir):
 
 
 def run_timing(rig, scene, frames):
-    print(f"\nTIMING  ({frames} frames per row, ms per frame: avg / max)")
-    print(f"{'layers on':<18} | {'OLD build':>11} {'OLD GPU':>11} {'OLD total':>10}"
-          f" | {'NEW build':>11} {'NEW GPU':>11} {'NEW total':>10} | speedup")
+    print(f"\nTIMING  ({frames} frames per row, average ms per frame)")
+    print(f"{'':<18} | {'OLD':^28} | {'LEAN':^28} | {'NEW':^28}")
+    print(f"{'layers on':<18} | {'build':>6} {'GPU':>6} {'total':>6} {'fps':>5}"
+          f" | {'build':>6} {'GPU':>6} {'total':>6} {'fps':>5}"
+          f" | {'build':>6} {'GPU':>6} {'total':>6} {'fps':>5}")
     rows = [('none (all hidden)', ()), ('PM', ('pm',)),
             ('PM + BP1', ('pm', 'bp1')), ('PM + BP1 + BP2', ('pm', 'bp1', 'bp2'))]
     for label, on in rows:
         sc = clone_scene(scene)
         for k in ('pm', 'bp1', 'bp2'):
             sc[k]['visible'] = k in on
-        res = []
-        for fn in (rig.render_old, rig.render_new):
+        cells = []
+        for fn in (rig.render_old, rig.render_lean, rig.render_new):
             for _ in range(5):                 # warm-up: shaders, caches
                 fn(sc)
                 rig.ctx.finish()
@@ -503,11 +551,9 @@ def run_timing(rig, scene, frames):
                 t2 = time.perf_counter()
                 build.append((t1 - t0) * 1000.0)
                 gpu.append((t2 - t1) * 1000.0)
-            res.append((np.mean(build), np.max(build), np.mean(gpu), np.max(gpu)))
-        (ob, obm, og, ogm), (nb, nbm, ng, ngm) = res
-        print(f"{label:<18} | {ob:5.1f}/{obm:<5.1f} {og:5.1f}/{ogm:<5.1f} {ob+og:>10.1f}"
-              f" | {nb:5.1f}/{nbm:<5.1f} {ng:5.1f}/{ngm:<5.1f} {nb+ng:>10.1f}"
-              f" | {(ob+og)/(nb+ng):5.2f}x")
+            b, g = np.mean(build), np.mean(gpu)
+            cells.append(f"{b:6.1f} {g:6.1f} {b+g:6.1f} {1000.0/(b+g):5.1f}")
+        print(f"{label:<18} | " + " | ".join(cells))
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
