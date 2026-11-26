@@ -1,4 +1,4 @@
-# v26.2.9
+# v26.2.11
 
 ## Notes: 
 The second release since the big move to GitHub. 
@@ -68,3 +68,9 @@ During cleanup in Patch 6 I found that admClear() was not actually used anywhere
 
 ### Patch 10: Jpeg not identified
 Found that while jpg is loaded as expected. jpeg however was not loaded and the VOP behaved like the mag was empty by showing just a white image. This has been remedied by simply adding "jpeg" to the list of acceptable image formats. Not sure why this wasn't done before today. 
+
+### Patch 11: Fixing some of the flickery exposures
+adding a variable to turn off adjust_maximum_thr by setting it to 0.0 so it doesnt' adjust the brightness of the captures. This hopefully makes for less flickery sequences. Especially with live-action transfers. 
+
+### Patch 12: More exposure flicker fixes
+Rebuilding how the VOP counts time. This also to minimize flickering. 

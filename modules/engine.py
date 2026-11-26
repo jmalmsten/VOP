@@ -50,6 +50,8 @@ import vop_math as vmath
 import camera_hardware as hw
 import color_utils as cutil
 import graphics_utils as gfx
+import exposure_clock as xclock # Slot scheduler for the exposure image
+
 import notifier  # best-effort phone push via self-hosted ntfy (modules/notifier.py)
 # Calibration store for hardware-calibration values (T_peak, black
 # floor at T_peak, future LUT data, etc.). See modules/calibration_store.py
@@ -91,6 +93,11 @@ signal.signal(signal.SIGTERM, handle_sigterm)
 
 def log_audit(msg): 
     print(f"[{time.strftime('%H:%M:%S')}] AUDIT (v0.2.6): {msg}", flush=True)
+
+# Fallback refresh period (60 Hz) used only if the boot-time measurement of
+# the real panel refresh (see the measure step in the engine setup) gives a 
+# nonsense answer. The live value is HDMI_REFRESH_MS, measured at startup
+DEFAULT_HDMI_REFRESH_MS = 1000.0 / 60.0
 
 def validate_black_clip(raw_clip):
     """
@@ -270,13 +277,44 @@ def run_persistent_engine():
     # We grab the KMSDRM lock here once. We never let it go.
     # ---------------------------------------------------------
     try:
-        screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.OPENGL | pygame.DOUBLEBUF | pygame.FULLSCREEN)
+        screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.OPENGL | pygame.DOUBLEBUF | pygame.FULLSCREEN, vsync=1)
     except pygame.error:
         log_audit("Hardware busy, retrying KMSDRM lock in 1s...")
         time.sleep(1.0)
-        screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.OPENGL | pygame.DOUBLEBUF | pygame.FULLSCREEN)
+        screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.OPENGL | pygame.DOUBLEBUF | pygame.FULLSCREEN, vsync=1)
     
     ctx, prog, vao = gfx.init_render_pipeline()
+
+    # Measure the panel's REAL refresh period instead of assuming 60 Hz
+    # Black flips only: nothing is being exposed yet, so this is safe at boot.
+    # We time 45 flips and skip the first interval (it can include setup
+    # stall), then take the MEDIAN so one hiccup can't skew the result.
+    # HAndles 30/60/120 HJz and odd rates like 59.94 with no config.
+    _stamps = []
+    for _ in range(180):
+        ctx.screen.use()
+        ctx.clear(0.0, 0.0, 0.0, 1.0)
+        pygame.display.flip()
+        _stamps.append(time.perf_counter())
+    _deltas = sorted ((b - a) * 1000.0 for a, b in zip(_stamps[1:], _stamps[2:]))
+    _measured_ms = _deltas[len(_deltas) // 2]
+
+    # Refine the median with a least-squares fit over all 180 flips. The
+    # median is robust but coarse; this pins the period down far more
+    # tightly, which matters because exposures are scheduled up to seconds
+    # ahead. If the fit fails we simply keep the median.
+    _boot_fit = xclock.fit_vblank_grid(_stamps, _measured_ms / 1000.0, skip=5, fit_period=True)
+    if _boot_fit is not None:
+        _measured_ms = _boot_fit[0].period * 1000.0
+
+    # Sanity window (20 Hz to 250 Hz). Outside it, flip() probably isn't
+    # blocking on vsync at all, so fall back to 60 Hz and say so loudly.
+    if 4.0 <= _measured_ms <= 50.0:
+        HDMI_REFRESH_MS = _measured_ms
+    else:
+        HDMI_REFRESH_MS = DEFAULT_HDMI_REFRESH_MS
+        log_audit(f"WARNING: refresh measure gave {_measured_ms:.2f}ms -flip() may not be vsync-blocked; using default")
+    log_audit(f"Panel refresh period: {HDMI_REFRESH_MS:.3f}ms ({1000.0 / HDMI_REFRESH_MS:.2f} Hz)")
 
     # Calibration framing/focus targets: its own program +
     # fullscreen quad, drawn in the idle branch while CAL_TARGETS_FILE
@@ -757,6 +795,49 @@ def run_persistent_engine():
                 vao.render(moderngl.TRIANGLE_STRIP)
                 ctx.disable(moderngl.BLEND)
 
+            def exposure_is_static(frame_num):
+                """
+                True when the picture cannot change during this exposure.
+
+                A static exposure is rendered once and held on screen for the
+                whole time, so its length depends only on the monitor clock,
+                never on how long a render takes. Anything that could animate
+                makes this return False (the safe answer).
+
+                Two things animate an exposure:
+                  1. The motion state (position, rotation, gels). The state is
+                     sampled at five points across the smear; if they all
+                     match, nothing moves. Five samples (not two) so a curve
+                     that happens to start and end at the same value is still
+                     caught.
+                  2. A sweep filter. The shader's sweep position follows the
+                     smear clock, so any layer with a sweep mode on counts as
+                     animated even if nothing moves.
+                """
+                if pm_sweep[0] or bp1_sweep[0] or bp2_sweep[0]:
+                    return False
+
+                def state_at(t_norm):
+                    # Same state lookup render_world uses for SSS and MDS.
+                    if timeline.mode == 'mds':
+                        return timeline.get_mds_state(float(frame_num), t_norm)
+                    st_base = timeline.get_state(frame_num)
+                    t_start = frame_num - (st_base['sd'] * st_base['ph'])
+                    t_end   = frame_num + (st_base['sd'] * (1.0 - st_base['ph']))
+                    return timeline.get_state(t_start + (t_end - t_start) * t_norm)
+
+                ref = state_at(0.0)
+                for t_norm in (0.25, 0.5, 0.75, 1.0):
+                    cur = state_at(t_norm)
+                    for key in ref:
+                        # atol 1e-6: far below anything the panel could show,
+                        # but swallows float rounding in the interpolation.
+                        if not np.allclose(np.asarray(ref[key], dtype='f8'),
+                                           np.asarray(cur[key], dtype='f8'),
+                                           rtol=0.0, atol=1e-6):
+                            return False
+                return True
+
             def execute_exposure(frame_num, is_preview=False, is_comp_preview=False):
                 # is_preview         -> Cam Preview: capture + JPG, no commit, no composite
                 # is_comp_preview    -> Comp Preview: capture + composite-in-memory + JPG, no commit
@@ -832,36 +913,130 @@ def run_persistent_engine():
                 log_audit(f"[{datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}] EXPOSURE {frame_num} | Wait complete. Boot delay: {boot_delay:.1f}ms")
                 log_audit(f"[{datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}] EXPOSURE {frame_num} | Starting HDMI sequence (500ms pre-roll)")
 
-                frame_rendered = False
+                # ---------------------------------------------------------
+                # SLOT-SCHEDULED SEQUENCE (replaces the flip-counted loop)
+                #
+                # WHY: rendering one composite frame takes 3-5 monitor
+                # refreshes on the Pi 4, so counting flips (or reading the
+                # wall clock between renders) cannot give an exact on-screen
+                # time. Here the monitor itself is the clock: the image is
+                # shown for exactly exp_slots refreshes, and the swap back to
+                # black is aimed at an absolute vblank, so a slow render can
+                # never stretch the exposure. Frames are rendered into the
+                # back buffer while the previous frame is on screen.
+                # The details live in modules/exposure_clock.py.
+                # ---------------------------------------------------------
+                exp_slots  = xclock.slots_for(smr_ms, HDMI_REFRESH_MS)     # image time, in refreshes
+                pre_flips  = max(1, int(round(500.0 / HDMI_REFRESH_MS)))   # black header
+                post_flips = max(1, int(round(500.0 / HDMI_REFRESH_MS)))   # black tail
 
-                while (time.time() - anchor) * 1000 < total_ms:
-                    pygame.event.pump()
-                    elapsed = (time.time() - anchor) * 1000
+                # Can the picture change during this exposure? If not, it is
+                # rendered once and simply held (see exposure_is_static).
+                static = exposure_is_static(frame_num)
 
-                    in_window = 500.0 <= elapsed <= (500.0 + smr_ms)
-                    missed_window = (elapsed > 500.0) and not frame_rendered
+                def draw_black_frame():
+                    # Draws pure black into the back buffer. No flip.
+                    # The same "optical shutter" black quad as before.
+                    ctx.screen.use()
+                    ctx.clear(0.0, 0.0, 0.0, 1.0)
+                    prog['mvp'].write(np.eye(4, dtype='f4').tobytes())
+                    prog['filter_color'].write(np.array([0.0, 0.0, 0.0], dtype='f4'))
+                    tex_mgr.white_tex.use(0)
+                    vao.render(moderngl.TRIANGLE_STRIP)
+                    ctx.finish()
 
-                    if in_window or missed_window:
-                        if not frame_rendered:
-                             log_audit(f"[{datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}] EXPOSURE {frame_num} | First image frame rendered at {elapsed:.1f}ms")
-
-                        clamped_elapsed = min(elapsed, 500.0 + smr_ms)
-                        t_norm = (clamped_elapsed - 500.0) / max(1.0, smr_ms)
-                        render_world(frame_num, t_norm, is_preview=False)
-                        frame_rendered = True
-                    else:
-                        # OPTICAL SHUTTER ENFORCEMENT
-                        # Draw a physical black quad to force the GPU to swap the buffer
-                        ctx.screen.use()
-                        ctx.clear(0.0, 0.0, 0.0, 1.0)
-                        prog['mvp'].write(np.eye(4, dtype='f4').tobytes())
-                        prog['filter_color'].write(np.array([0.0, 0.0, 0.0], dtype='f4'))
-                        tex_mgr.white_tex.use(0)
-                        vao.render(moderngl.TRIANGLE_STRIP)
-
-                    ctx.finish()  
+                def show_black_frame():
+                    # Black frame + flip. Blocks until the swap is done.
+                    draw_black_frame()
                     pygame.display.flip()
-                
+
+                # Black header: the projection-side shutter is closed.
+                # The time each flip returns is kept: with vsync on, those
+                # moments sit on the monitor's vblank grid, which is how the
+                # scheduler learns where the vblanks are.
+                pre_stamps = []
+                for _ in range(pre_flips):
+                    pygame.event.pump()
+                    show_black_frame()
+                    pre_stamps.append(time.perf_counter())
+
+                # Fit the vblank grid (period is known from boot, so only
+                # the phase is fitted). If that fails the flips were not
+                # vsync-locked; carry on with the best guess and say so.
+                _fit = xclock.fit_vblank_grid(pre_stamps, HDMI_REFRESH_MS / 1000.0)
+                if _fit is not None:
+                    grid, fit_spread_ms, fit_points = _fit
+                else:
+                    grid = xclock.VblankGrid(pre_stamps[-1], HDMI_REFRESH_MS / 1000.0)
+                    fit_spread_ms, fit_points = -1.0, 0
+                    log_audit(f"WARNING: EXPOSURE {frame_num} | black flips are not vsync-locked; "
+                              f"exposure length is NOT reliable (is vsync=1 set in set_mode?)")
+
+                # Per-render timing buckets (ms): build = CPU work issuing the
+                # draw calls, gpu = time ctx.finish() waits for the GPU.
+                t_build_ms, t_gpu_ms = [], []
+
+                def render_image_frame(t_norm):
+                    # One composite frame into the BACK buffer, then wait
+                    # for the GPU so the scheduler knows when it is ready.
+                    # Does not flip - the scheduler decides when to swap.
+                    t_a = time.perf_counter()
+                    render_world(frame_num, t_norm, is_preview=False)
+                    t_b = time.perf_counter()
+                    ctx.finish()
+                    t_c = time.perf_counter()
+                    t_build_ms.append((t_b - t_a) * 1000.0)
+                    t_gpu_ms.append((t_c - t_b) * 1000.0)
+
+                # THE IMAGE PHASE. Returns once the swap to black has been
+                # requested for the planned vblank.
+                rep = xclock.run_image_phase(
+                    xclock.RealClock(), grid, exp_slots, static, pre_stamps[-1],
+                    render_image_frame, pygame.display.flip,
+                    draw_black_frame, pygame.event.pump)
+
+                # Black tail. The final swap above already put the first
+                # black frame on its way, so one flip fewer is needed.
+                post_stamps = []
+                for _ in range(max(1, post_flips - 1)):
+                    pygame.event.pump()
+                    show_black_frame()
+                    post_stamps.append(time.perf_counter())
+
+                # AUDIT. These lines are how you check an exposure was right.
+                #   slots     : refreshes the image is meant to be on screen
+                #               (planned ms = slots x refresh; requested ms
+                #               is what EXP asked for - they differ by up
+                #               to half a refresh, and by the same amount
+                #               on every frame with the same EXP)
+                #   groups    : how many different frames were rendered
+                #               (1 = static: rendered once, held)
+                #   margins   : how long BEFORE its vblank each edge swap
+                #               was requested (~12 ms expected; under ~5 ms
+                #               means the timer woke up late)
+                #   drift     : after the exposure, how far the real vblanks
+                #               are from where the scheduler predicted them
+                #               (should be well under 1 ms)
+                _drift_ms = xclock.grid_residual_ms(grid, post_stamps[1:])
+                log_audit(f"EXPOSURE {frame_num} | slots {rep['slots']} = {rep['planned_ms']:.1f} ms "
+                          f"(requested {smr_ms:.1f} ms) | "
+                          f"{'static, 1 render' if static else str(rep['groups']) + ' groups'} "
+                          f"sizes {rep['sizes'][0]}..{rep['sizes'][-1]} | "
+                          f"render {rep['render_ms']:.1f} ms")
+                log_audit(f"EXPOSURE {frame_num} | first swap margin {rep['first_margin_ms']:.1f} ms "
+                          f"(slipped {rep['first_shift']} slot), final swap margin {rep['final_margin_ms']:.1f} ms, "
+                          f"swap-to-swap {rep['span_ms']:.1f} ms | late {rep['late']} dropped {rep['dropped']} | "
+                          f"flip blocks: {rep['flip_blocks']}")
+                log_audit(f"EXPOSURE {frame_num} | vblank grid: fit spread {fit_spread_ms:.2f} ms over "
+                          f"{fit_points} flips, drift after exposure {_drift_ms:+.2f} ms | "
+                          f"build avg/max {sum(t_build_ms)/len(t_build_ms):.1f}/{max(t_build_ms):.1f} ms, "
+                          f"GPU avg/max {sum(t_gpu_ms)/len(t_gpu_ms):.1f}/{max(t_gpu_ms):.1f} ms")
+                if rep['final_late'] or rep['final_margin_ms'] < 5.0 or abs(_drift_ms) > 2.0 \
+                        or (rep['final_slot_err'] not in (None, 0)):
+                    log_audit(f"WARNING: EXPOSURE {frame_num} | the swap to black may have landed one "
+                              f"refresh off plan (final margin {rep['final_margin_ms']:.1f} ms, "
+                              f"drift {_drift_ms:+.2f} ms). This frame's exposure may be one slot "
+                              f"({HDMI_REFRESH_MS:.1f} ms) long or short.")
                 # ---------------------------------------------------------
                 # POST-EXPOSURE BLACKOUT
                 # Guarantee the screen drops to black by forcing geometry
